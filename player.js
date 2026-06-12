@@ -67,7 +67,6 @@ function setWeaponSprite(index) {
     else if (index === 2) wSprite.src = 'assets/rifle.png';
     else if (index === 3) {
         wSprite.src = 'assets/plasma.png';
-        wSprite.style.filter = 'hue-rotate(180deg) brightness(1.5)';
     }
 }
 
