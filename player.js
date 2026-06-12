@@ -62,11 +62,14 @@ function setWeaponSprite(index) {
     const wSprite = document.getElementById('weapon-sprite');
     if (!wSprite) return;
     wSprite.style.filter = 'none';
+    wSprite.style.mixBlendMode = 'normal';
+    
     if (index === 0) wSprite.src = 'assets/pistol.png';
     else if (index === 1) wSprite.src = 'assets/weapon.png';
     else if (index === 2) wSprite.src = 'assets/rifle.png';
     else if (index === 3) {
         wSprite.src = 'assets/plasma.png';
+        wSprite.style.mixBlendMode = 'screen'; // Removes black background
     }
 }
 
