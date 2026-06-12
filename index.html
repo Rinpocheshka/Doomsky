@@ -3,6 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Doomsky 3D — браузерный ретро шутер от первого лица на Three.js с 4 уровнями и финальным боссом.">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>💀</text></svg>">
     <title>Doomsky 3D</title>
     <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=VT323&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="style.css">
@@ -97,8 +99,8 @@
         <!-- Popup Messages -->
         <div id="popup-container"></div>
         
-        <!-- Weapon Sprite -->
-        <img id="weapon-sprite" src="assets/pistol.png" alt="weapon">
+        <!-- Weapon Sprite (hidden until game starts) -->
+        <img id="weapon-sprite" src="assets/pistol.png" alt="weapon" style="display:none;">
         
         <!-- Bottom HUD -->
         <div id="hud-panel">
@@ -132,6 +134,14 @@
         
         <!-- Screen flash effects -->
         <div id="damage-flash"></div>
+        
+        <!-- Boss HP Bar (shown only on Level 4) -->
+        <div id="boss-hpbar-container" style="display:none;">
+            <div id="boss-hp-text">БОСС</div>
+            <div id="boss-hpbar-track">
+                <div id="boss-hpbar-fill"></div>
+            </div>
+        </div>
     </div>
     
     <!-- Three.js -->

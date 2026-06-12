@@ -162,8 +162,9 @@ function nextLevel() {
     document.getElementById('victory').style.display = 'none';
     gameState = 'PLAYING';
     
-    // Keep weapons and score, refresh health
+    // Keep weapons and score, refresh health, guarantee minimum ammo
     playerStats.health = playerStats.maxHealth;
+    playerStats.ammo = Math.max(playerStats.ammo, 20); // Never enter next level broke
     if (typeof updateHUD === 'function') updateHUD();
     
     if (typeof loadLevel === 'function') loadLevel(currentLevel);

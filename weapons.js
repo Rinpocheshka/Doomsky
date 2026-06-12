@@ -4,6 +4,9 @@ let isShooting = false;
 const raycaster = new THREE.Raycaster();
 const tracers = [];
 
+// Track muzzle light to prevent accumulation on rapid fire
+let activeMuzzleLight = null;
+
 // ── Weapon Sounds ──
 function playShotgunSound() {
     if (audioCtx.state === 'suspended') audioCtx.resume();
@@ -28,6 +31,7 @@ function playShotgunSound() {
     filter.connect(gainNode);
     gainNode.connect(audioCtx.destination);
     noise.start();
+    noise.stop(audioCtx.currentTime + 0.3); // BUG FIX: was never stopped
 }
 
 function playPistolSound() {
@@ -69,6 +73,7 @@ function playRifleSound() {
     filter.connect(gainNode);
     gainNode.connect(audioCtx.destination);
     noise.start();
+    noise.stop(audioCtx.currentTime + 0.1); // BUG FIX: audio node leak fixed
 }
 
 function playPlasmaSound() {
@@ -91,6 +96,8 @@ function playPlasmaSound() {
 // ── Chroma Key (for HUD weapon sprite) ──
 function removeBackground(imgElement) {
     if (!imgElement.src || imgElement.src.startsWith('data:')) return;
+    // Skip chroma-key for plasma — it uses mix-blend-mode:screen instead
+    if (imgElement.src.includes('plasma.png')) return;
     
     const canvas = document.createElement('canvas');
     const ctx = canvas.getContext('2d');
@@ -156,31 +163,41 @@ document.addEventListener('mouseup', () => {
     mouseIsDown = false;
 });
 
+// Auto-switch to best available weapon when current is out of ammo
+function autoSwitchWeapon() {
+    if (playerStats.hasPlasma && playerStats.ammo >= 5) {
+        playerStats.currentWeapon = 3;
+    } else if (playerStats.hasRifle && playerStats.ammo > 0) {
+        playerStats.currentWeapon = 2;
+    } else if (playerStats.hasShotgun && playerStats.ammo > 0) {
+        playerStats.currentWeapon = 1;
+    } else {
+        playerStats.currentWeapon = 0; // Pistol: infinite
+    }
+    if (typeof setWeaponSprite === 'function') setWeaponSprite(playerStats.currentWeapon);
+    if (typeof updateHUD === 'function') updateHUD();
+    showPopup('НЕТ ПАТРОНОВ → СМЕНА ОРУЖИЯ', '#ffaa00');
+}
+
 function tryShoot() {
     if (gameState !== 'PLAYING' || !controls.isLocked || isShooting) return;
     
-    if (playerStats.currentWeapon > 0 && playerStats.ammo <= 0) {
-        playerStats.currentWeapon = 0;
-        if (typeof setWeaponSprite === 'function') setWeaponSprite(0);
-        if (typeof updateHUD === 'function') updateHUD();
-        return;
-    }
+    const w = playerStats.currentWeapon;
+    // Check ammo availability per weapon
+    if (w === 1 && playerStats.ammo <= 0) { autoSwitchWeapon(); return; }
+    if (w === 2 && playerStats.ammo <= 0) { autoSwitchWeapon(); return; }
+    if (w === 3 && playerStats.ammo < 5) { autoSwitchWeapon(); return; }
     
     shoot();
 }
 
-function createTracer() {
+function createTracer(hitIntersects) {
     const material = new THREE.LineBasicMaterial({ color: 0xffff00, transparent: true, opacity: 0.8 });
     const points = [];
     
-    raycaster.setFromCamera(new THREE.Vector2(0, 0), camera);
     let endPoint = new THREE.Vector3();
-    
-    const enems = typeof getEnemies === 'function' ? getEnemies() : [];
-    const walls = typeof getLevelWalls === 'function' ? getLevelWalls() : [];
-    const intersects = raycaster.intersectObjects([...enems, ...walls]);
-    if (intersects.length > 0) {
-        endPoint.copy(intersects[0].point);
+    if (hitIntersects && hitIntersects.length > 0) {
+        endPoint.copy(hitIntersects[0].point);
     } else {
         raycaster.ray.at(50, endPoint);
     }
@@ -200,6 +217,7 @@ function shoot() {
     
     let damage = 20;
     let cooldown = 250;
+    let flashColor = 'rgba(255,200,0,1)';
     
     if (playerStats.currentWeapon === 1) { // Shotgun
         playerStats.ammo--;
@@ -212,113 +230,152 @@ function shoot() {
         cooldown = 120;
         playRifleSound();
     } else if (playerStats.currentWeapon === 3) { // Plasma
-        if (playerStats.ammo < 5) {
-            // Not enough ammo for plasma
-            isShooting = false;
-            playerStats.currentWeapon = 0;
-            if (typeof setWeaponSprite === 'function') setWeaponSprite(0);
-            if (typeof updateHUD === 'function') updateHUD();
-            return;
-        }
         playerStats.ammo -= 5;
         damage = 120;
         cooldown = 700;
+        flashColor = 'rgba(0,200,255,1)';
         playPlasmaSound();
     } else {
         playPistolSound();
     }
 
-    createTracer();
+    // ── Single raycaster call — results reused for tracer AND hit detection ──
+    raycaster.setFromCamera(new THREE.Vector2(0, 0), camera);
+    const enems = typeof getEnemies === 'function' ? getEnemies() : [];
+    const levelWalls = typeof getLevelWalls === 'function' ? getLevelWalls() : [];
+    const allIntersects = raycaster.intersectObjects([...enems, ...levelWalls]);
+    
+    createTracer(allIntersects);
 
     // Visual Recoil
     const weaponSprite = document.getElementById('weapon-sprite');
     const muzzleFlash = document.getElementById('muzzle-flash');
     
-    // Dynamic 3D muzzle light
-    const mLight = new THREE.PointLight(0xffddaa, 3, 40);
-    mLight.position.copy(controls.getObject().position);
-    scene.add(mLight);
+    // Dynamic 3D muzzle light — remove previous if still active
+    if (activeMuzzleLight) {
+        scene.remove(activeMuzzleLight);
+        activeMuzzleLight = null;
+    }
+    const mLightColor = playerStats.currentWeapon === 3 ? 0x00ddff : 0xffddaa;
+    activeMuzzleLight = new THREE.PointLight(mLightColor, 3, 40);
+    activeMuzzleLight.position.copy(controls.getObject().position);
+    scene.add(activeMuzzleLight);
     
     let recoilAmount = '-30px';
     if (playerStats.currentWeapon === 1) recoilAmount = '-60px';
     if (playerStats.currentWeapon === 3) recoilAmount = '-50px';
     
-    weaponSprite.style.bottom = recoilAmount;
-    weaponSprite.style.transform = `translateX(-50%) scale(1.08) rotate(${(Math.random()-0.5)*6}deg)`;
+    if (weaponSprite) {
+        weaponSprite.style.bottom = recoilAmount;
+        weaponSprite.style.transform = `translateX(-50%) scale(1.08) rotate(${(Math.random()-0.5)*6}deg)`;
+    }
     
-    if (muzzleFlash) muzzleFlash.style.display = 'block';
+    if (muzzleFlash) {
+        muzzleFlash.style.background = `radial-gradient(circle, ${flashColor} 0%, rgba(255,100,0,0.8) 40%, rgba(255,0,0,0) 80%)`;
+        muzzleFlash.style.display = 'block';
+    }
 
     setTimeout(() => {
-        weaponSprite.style.bottom = '80px';
-        weaponSprite.style.transform = `translateX(-50%) scale(1) rotate(0deg)`;
+        if (weaponSprite) {
+            weaponSprite.style.bottom = '80px';
+            weaponSprite.style.transform = `translateX(-50%) scale(1) rotate(0deg)`;
+        }
         if (muzzleFlash) muzzleFlash.style.display = 'none';
-        scene.remove(mLight);
+        if (activeMuzzleLight) {
+            scene.remove(activeMuzzleLight);
+            activeMuzzleLight = null;
+        }
         setTimeout(() => { isShooting = false; }, cooldown - 100);
     }, 100);
 
-    // Hit Logic
-    raycaster.setFromCamera(new THREE.Vector2(0, 0), camera);
-    if (typeof getEnemies === 'function') {
-        const enemies = getEnemies();
-        const intersects = raycaster.intersectObjects([...enemies, ...getLevelWalls()]);
-
-        if (intersects.length > 0) {
-            const hitObject = intersects[0].object;
-            const hitPoint = intersects[0].point;
+    // Hit Logic — reuses allIntersects computed above
+    if (allIntersects.length > 0) {
+        const hitObject = allIntersects[0].object;
+        const hitPoint = allIntersects[0].point;
+        
+        if (hitObject.userData && hitObject.userData.isEnemy) {
+            hitObject.userData.health -= damage;
             
-            if (hitObject.userData && hitObject.userData.isEnemy) {
-                hitObject.userData.health -= damage;
-                
-                // Hit flash
-                hitObject.material.color.setHex(0xff0000);
-                setTimeout(() => {
-                    if (hitObject.material) hitObject.material.color.setHex(0xffffff);
-                }, 80);
-                
-                playSound('hit');
-                // Blood particles
-                spawnParticles(hitPoint, 5, 0xff0000);
+            // Hit flash
+            hitObject.material.color.setHex(0xff0000);
+            setTimeout(() => {
+                if (hitObject.material) hitObject.material.color.setHex(0xffffff);
+            }, 80);
+            
+            playSound('hit');
+            // Blood particles
+            spawnParticles(hitPoint, 5, 0xff0000);
 
-                if (hitObject.userData.health <= 0) {
-                    // Death!
-                    playSound('enemy_die');
-                    spawnParticles(hitObject.position.clone(), 15, 0xff2200);
+            // Update boss HP bar if applicable
+            if (hitObject.userData.type === 3) {
+                updateBossHPBar(hitObject.userData.health, hitObject.userData.maxHealth);
+            }
+
+            if (hitObject.userData.health <= 0) {
+                // Death!
+                playSound('enemy_die');
+                spawnParticles(hitObject.position.clone(), 15, 0xff2200);
+
+                // Hide boss bar on death
+                if (hitObject.userData.type === 3) {
+                    const bossBar = document.getElementById('boss-hpbar-container');
+                    if (bossBar) bossBar.style.display = 'none';
+                }
+                
+                // 30% Loot Drop (boss always drops loot)
+                const dropRoll = Math.random();
+                const isBoss = hitObject.userData.type === 3;
+                if (isBoss || dropRoll < 0.3) {
+                    const roll = Math.random();
+                    let dropType = 'ammo';
+                    if (roll < 0.33) dropType = 'medkit';
+                    else if (roll < 0.66) dropType = 'armor';
                     
-                    // 30% Loot Drop
-                    if (Math.random() < 0.3) {
-                        const roll = Math.random();
-                        let dropType = 'ammo';
-                        if (roll < 0.33) dropType = 'medkit';
-                        else if (roll < 0.66) dropType = 'armor';
-                        
-                        if (typeof spawnItemSprite === 'function') {
-                            spawnItemSprite(hitObject.position.x, hitObject.position.z, dropType);
+                    if (typeof spawnItemSprite === 'function') {
+                        spawnItemSprite(hitObject.position.x, hitObject.position.z, dropType);
+                        if (isBoss) {
+                            // Boss drops extra loot
+                            spawnItemSprite(hitObject.position.x + 2, hitObject.position.z, 'medkit');
+                            spawnItemSprite(hitObject.position.x - 2, hitObject.position.z, 'armor');
                         }
                     }
-                    
-                    scene.remove(hitObject);
-                    if(hitObject.userData.ui) hitObject.userData.ui.remove();
-                    const index = enemies.indexOf(hitObject);
-                    if (index > -1) enemies.splice(index, 1);
-                    
-                    totalKills++;
-                    score += 100;
-                    showPopup('+100', '#ff66ff');
-                    
-                    if (typeof updateHUD === 'function') updateHUD();
-                    if (typeof updateKillCounter === 'function') updateKillCounter();
                 }
-            } else {
-                // Wall hit particles
-                spawnParticles(hitPoint, 4, 0x888888);
+                
+                scene.remove(hitObject);
+                if(hitObject.userData.ui) hitObject.userData.ui.remove();
+                const idx = enems.indexOf(hitObject);
+                if (idx > -1) enems.splice(idx, 1);
+                
+                totalKills++;
+                const killScore = isBoss ? 1000 : 100;
+                score += killScore;
+                showPopup(isBoss ? '⚠ БОСС ПОВЕРЖЕН! +1000' : '+100', isBoss ? '#ff00ff' : '#ff66ff');
+                
+                if (typeof updateHUD === 'function') updateHUD();
+                if (typeof updateKillCounter === 'function') updateKillCounter();
             }
+        } else {
+            // Wall hit particles
+            spawnParticles(hitPoint, 4, 0x888888);
         }
     }
     
     if (typeof updateHUD === 'function') updateHUD();
 }
 
+function updateBossHPBar(hp, maxHp) {
+    const container = document.getElementById('boss-hpbar-container');
+    const fill = document.getElementById('boss-hpbar-fill');
+    const hpText = document.getElementById('boss-hp-text');
+    if (!container || !fill) return;
+    container.style.display = 'flex';
+    const pct = Math.max(0, (hp / maxHp) * 100);
+    fill.style.width = pct + '%';
+    if (hpText) hpText.textContent = `БОСС  ${Math.ceil(hp)} / ${maxHp}`;
+}
+
 function updateWeapons(delta) {
+    // Auto-fire only for Rifle
     if (mouseIsDown && playerStats.currentWeapon === 2 && !isShooting) {
         tryShoot();
     }

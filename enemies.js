@@ -139,7 +139,13 @@ function updateEnemies(delta) {
                 // Alert sound on first detection
                 if (ud.alertTimer <= 0) {
                     ud.alertTimer = 30;
-                    playSound('enemy_die'); // repurpose as grunt/alert sound
+                    playSound('enemy_die');
+                }
+                // Show boss HP bar on first detection
+                if (ud.type === 3) {
+                    if (typeof updateBossHPBar === 'function') {
+                        updateBossHPBar(ud.health, ud.maxHealth);
+                    }
                 }
             } else {
                 ud.idleTimer -= delta;
