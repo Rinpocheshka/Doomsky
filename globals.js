@@ -1,0 +1,179 @@
+// Global variables and Game State
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x050505);
+scene.fog = new THREE.FogExp2(0x050505, 0.035); // Exponential fog — denser, more atmospheric
+
+const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+
+const renderer = new THREE.WebGLRenderer({ antialias: false });
+const controls = new THREE.PointerLockControls(camera, document.body);
+const clock = new THREE.Clock();
+
+// Game State
+let gameState = 'MENU'; // MENU, PLAYING, GAMEOVER, VICTORY, FINAL_VICTORY
+let currentLevel = 0;
+let score = 0;
+let totalKills = 0;
+let levelStartTime = 0;
+
+let playerStats = {
+    health: 100,
+    armor: 0,
+    ammo: 0,
+    maxHealth: 100,
+    maxArmor: 100,
+    currentWeapon: 0, // 0=Pistol, 1=Shotgun, 2=Rifle, 3=Plasma
+    hasShotgun: false,
+    hasRifle: false,
+    hasPlasma: false
+};
+
+const items = [];
+const levelLights = []; // Dynamic point lights per level
+
+// ──── Audio Context ────
+const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+const bgMusic = new Audio('assets/Teeth_of_the_Machine.mp3');
+bgMusic.loop = true;
+bgMusic.volume = 0.5;
+
+// ──── Sound Effects ────
+function playSound(type) {
+    if (audioCtx.state === 'suspended') audioCtx.resume();
+    
+    switch(type) {
+        case 'pickup': {
+            const osc = audioCtx.createOscillator();
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(600, audioCtx.currentTime);
+            osc.frequency.exponentialRampToValueAtTime(1200, audioCtx.currentTime + 0.1);
+            const g = audioCtx.createGain();
+            g.gain.setValueAtTime(0.3, audioCtx.currentTime);
+            g.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.15);
+            osc.connect(g); g.connect(audioCtx.destination);
+            osc.start(); osc.stop(audioCtx.currentTime + 0.15);
+            break;
+        }
+        case 'hit': {
+            const buf = audioCtx.createBuffer(1, audioCtx.sampleRate * 0.08, audioCtx.sampleRate);
+            const d = buf.getChannelData(0);
+            for (let i = 0; i < d.length; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / d.length);
+            const s = audioCtx.createBufferSource(); s.buffer = buf;
+            const g = audioCtx.createGain(); g.gain.setValueAtTime(0.4, audioCtx.currentTime);
+            g.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.08);
+            s.connect(g); g.connect(audioCtx.destination); s.start();
+            break;
+        }
+        case 'enemy_die': {
+            const osc = audioCtx.createOscillator();
+            osc.type = 'sawtooth';
+            osc.frequency.setValueAtTime(200, audioCtx.currentTime);
+            osc.frequency.exponentialRampToValueAtTime(30, audioCtx.currentTime + 0.4);
+            const g = audioCtx.createGain();
+            g.gain.setValueAtTime(0.5, audioCtx.currentTime);
+            g.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.4);
+            osc.connect(g); g.connect(audioCtx.destination);
+            osc.start(); osc.stop(audioCtx.currentTime + 0.4);
+            break;
+        }
+        case 'footstep': {
+            const buf = audioCtx.createBuffer(1, audioCtx.sampleRate * 0.05, audioCtx.sampleRate);
+            const d = buf.getChannelData(0);
+            for (let i = 0; i < d.length; i++) d[i] = (Math.random() * 2 - 1) * 0.3 * (1 - i / d.length);
+            const s = audioCtx.createBufferSource(); s.buffer = buf;
+            const f = audioCtx.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = 400;
+            const g = audioCtx.createGain(); g.gain.value = 0.15;
+            s.connect(f); f.connect(g); g.connect(audioCtx.destination); s.start();
+            break;
+        }
+        case 'portal': {
+            const osc = audioCtx.createOscillator();
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(300, audioCtx.currentTime);
+            osc.frequency.linearRampToValueAtTime(800, audioCtx.currentTime + 0.5);
+            const g = audioCtx.createGain();
+            g.gain.setValueAtTime(0.3, audioCtx.currentTime);
+            g.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.6);
+            osc.connect(g); g.connect(audioCtx.destination);
+            osc.start(); osc.stop(audioCtx.currentTime + 0.6);
+            break;
+        }
+    }
+}
+
+// ──── Popup Message System ────
+function showPopup(text, color = '#ffaa00') {
+    const container = document.getElementById('popup-container');
+    if (!container) return;
+    const msg = document.createElement('div');
+    msg.className = 'popup-msg';
+    msg.textContent = text;
+    msg.style.color = color;
+    container.appendChild(msg);
+    setTimeout(() => msg.remove(), 2000);
+}
+
+// ──── Transparent Texture Loader ────
+function loadTransparentTexture(url, callback) {
+    const img = new Image();
+    img.crossOrigin = "Anonymous";
+    img.onload = () => {
+        const canvas = document.createElement('canvas');
+        canvas.width = img.width;
+        canvas.height = img.height;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0);
+        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        const data = imageData.data;
+        for (let i = 0; i < data.length; i += 4) {
+            if ((data[i] < 30 && data[i+1] < 30 && data[i+2] < 30) ||
+                (data[i] > 200 && data[i+1] > 200 && data[i+2] > 200)) {
+                data[i+3] = 0;
+            }
+        }
+        ctx.putImageData(imageData, 0, 0);
+        const texture = new THREE.CanvasTexture(canvas);
+        texture.magFilter = THREE.NearestFilter;
+        texture.minFilter = THREE.NearestFilter;
+        if (callback) callback(texture);
+    };
+    img.src = url;
+}
+
+// ──── Particle System (for enemy death) ────
+const particles = [];
+
+function spawnParticles(position, count, color) {
+    for (let i = 0; i < count; i++) {
+        const geo = new THREE.SphereGeometry(0.1, 4, 4);
+        const mat = new THREE.MeshBasicMaterial({ color: color });
+        const p = new THREE.Mesh(geo, mat);
+        p.position.copy(position);
+        p.userData.velocity = new THREE.Vector3(
+            (Math.random() - 0.5) * 10,
+            Math.random() * 8 + 2,
+            (Math.random() - 0.5) * 10
+        );
+        p.userData.life = 0.8 + Math.random() * 0.4;
+        scene.add(p);
+        particles.push(p);
+    }
+}
+
+function updateParticles(delta) {
+    for (let i = particles.length - 1; i >= 0; i--) {
+        const p = particles[i];
+        p.userData.life -= delta;
+        p.position.add(p.userData.velocity.clone().multiplyScalar(delta));
+        p.userData.velocity.y -= 15 * delta; // gravity
+        p.material.opacity = Math.max(0, p.userData.life);
+        p.material.transparent = true;
+        if (p.userData.life <= 0) {
+            scene.remove(p);
+            p.geometry.dispose();
+            p.material.dispose();
+            particles.splice(i, 1);
+        }
+    }
+}

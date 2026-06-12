@@ -1,0 +1,364 @@
+// Player Movement, Physics, and Jumping
+
+const playerSpeed = 40.0;
+const runSpeed = 70.0;
+const gravity = 30.0;
+const jumpVelocity = 14.0;
+const playerHeight = 2.0;
+
+const velocity = new THREE.Vector3();
+const direction = new THREE.Vector3();
+
+let moveForward = false;
+let moveBackward = false;
+let moveLeft = false;
+let moveRight = false;
+let isRunning = false;
+let canJump = false;
+let jumpCount = 0;
+
+let bobTimer = 0;
+let footstepTimer = 0;
+
+function initPlayer() {
+    updateHUD();
+}
+
+function updateHUD() {
+    const healthEl = document.getElementById('health-value');
+    const armorEl = document.getElementById('armor-value');
+    const ammoEl = document.getElementById('ammo-value');
+    const scoreEl = document.getElementById('score-value');
+    const weaponEl = document.getElementById('weapon-name');
+    const healthBar = document.getElementById('health-bar');
+    const armorBar = document.getElementById('armor-bar');
+    
+    if (healthEl) healthEl.innerText = playerStats.health;
+    if (armorEl) armorEl.innerText = playerStats.armor;
+    if (ammoEl) ammoEl.innerText = playerStats.currentWeapon === 0 ? '∞' : playerStats.ammo;
+    if (scoreEl) scoreEl.innerText = score;
+    
+    let wName = 'ПИСТОЛЕТ';
+    if (playerStats.currentWeapon === 1) wName = 'ДРОБОВИК';
+    if (playerStats.currentWeapon === 2) wName = 'ВИНТОВКА';
+    if (playerStats.currentWeapon === 3) wName = 'ПЛАЗМОГАН';
+    if (weaponEl) weaponEl.innerText = wName;
+    
+    // Health bar width
+    if (healthBar) healthBar.style.width = `${(playerStats.health / playerStats.maxHealth) * 100}%`;
+    if (armorBar) armorBar.style.width = `${(playerStats.armor / playerStats.maxArmor) * 100}%`;
+    
+    // Color change at low health
+    if (healthEl && playerStats.health <= 30) {
+        healthEl.style.color = '#ff0000';
+        healthEl.style.textShadow = '0 0 10px rgba(255,0,0,0.8)';
+    } else if (healthEl) {
+        healthEl.style.color = '#ff4444';
+        healthEl.style.textShadow = 'none';
+    }
+}
+
+function setWeaponSprite(index) {
+    const wSprite = document.getElementById('weapon-sprite');
+    if (!wSprite) return;
+    wSprite.style.filter = 'none';
+    if (index === 0) wSprite.src = 'assets/pistol.png';
+    else if (index === 1) wSprite.src = 'assets/weapon.png';
+    else if (index === 2) wSprite.src = 'assets/rifle.png';
+    else if (index === 3) {
+        wSprite.src = 'assets/plasma.png';
+        wSprite.style.filter = 'hue-rotate(180deg) brightness(1.5)';
+    }
+}
+
+function takeDamage(amount) {
+    let damageToHealth = amount;
+    if (playerStats.armor > 0) {
+        const armorDmg = Math.min(amount * 0.5, playerStats.armor);
+        playerStats.armor = Math.round(playerStats.armor - armorDmg);
+        damageToHealth -= armorDmg;
+    }
+    
+    playerStats.health = Math.max(0, playerStats.health - Math.ceil(damageToHealth));
+    
+    // Screen flash
+    const flash = document.getElementById('damage-flash');
+    flash.style.background = 'rgba(255, 0, 0, 0.4)';
+    setTimeout(() => { flash.style.background = 'rgba(255, 0, 0, 0)'; }, 150);
+    
+    updateHUD();
+    
+    // Camera shake
+    controls.getObject().position.x += (Math.random() - 0.5) * 0.4;
+    controls.getObject().position.y += (Math.random() - 0.5) * 0.3;
+    
+    if (playerStats.health <= 0) {
+        gameState = 'GAMEOVER';
+        if (typeof bgMusic !== 'undefined') bgMusic.pause();
+        document.exitPointerLock();
+        const el = document.getElementById('game-over');
+        el.style.display = 'flex';
+        document.getElementById('death-stats').innerHTML = 
+            `Убито врагов: ${totalKills}<br>Очки: ${score}`;
+    }
+}
+
+const onKeyDown = function (event) {
+    if (gameState !== 'PLAYING') return;
+    switch (event.code) {
+        case 'ArrowUp':
+        case 'KeyW': moveForward = true; break;
+        case 'ArrowLeft':
+        case 'KeyA': moveLeft = true; break;
+        case 'ArrowDown':
+        case 'KeyS': moveBackward = true; break;
+        case 'ArrowRight':
+        case 'KeyD': moveRight = true; break;
+        case 'ShiftLeft': isRunning = true; break;
+        case 'Space':
+            if (canJump === true) {
+                velocity.y = jumpVelocity;
+                canJump = false;
+                jumpCount = 1;
+            } else if (jumpCount === 1) {
+                // Double jump!
+                velocity.y = jumpVelocity;
+                jumpCount = 2;
+            }
+            break;
+        case 'Digit1':
+            playerStats.currentWeapon = 0;
+            setWeaponSprite(0);
+            updateHUD();
+            break;
+        case 'Digit2':
+            if (playerStats.hasShotgun) {
+                playerStats.currentWeapon = 1;
+                setWeaponSprite(1);
+                updateHUD();
+            }
+            break;
+        case 'Digit3':
+            if (playerStats.hasRifle) {
+                playerStats.currentWeapon = 2;
+                setWeaponSprite(2);
+                updateHUD();
+            }
+            break;
+        case 'Digit4':
+            if (playerStats.hasPlasma) {
+                playerStats.currentWeapon = 3;
+                setWeaponSprite(3);
+                updateHUD();
+            }
+            break;
+    }
+};
+
+const onKeyUp = function (event) {
+    switch (event.code) {
+        case 'ArrowUp':
+        case 'KeyW': moveForward = false; break;
+        case 'ArrowLeft':
+        case 'KeyA': moveLeft = false; break;
+        case 'ArrowDown':
+        case 'KeyS': moveBackward = false; break;
+        case 'ArrowRight':
+        case 'KeyD': moveRight = false; break;
+        case 'ShiftLeft': isRunning = false; break;
+    }
+};
+
+document.addEventListener('keydown', onKeyDown);
+document.addEventListener('keyup', onKeyUp);
+
+function checkCollision(position) {
+    if (typeof getLevelWalls === 'function') {
+        const walls = getLevelWalls();
+        for (let i = 0; i < walls.length; i++) {
+            const wall = walls[i];
+            const dx = Math.abs(position.x - wall.position.x);
+            const dz = Math.abs(position.z - wall.position.z);
+            if (dx < 2.5 && dz < 2.5) {
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
+function checkInteractions(position) {
+    for (let i = items.length - 1; i >= 0; i--) {
+        const item = items[i];
+        if (position.distanceTo(item.position) < 2.5) {
+            const type = item.userData.type;
+            let picked = false;
+            
+            if (type === 'medkit' && playerStats.health < playerStats.maxHealth) {
+                playerStats.health = Math.min(playerStats.health + 25, playerStats.maxHealth);
+                showPopup('АПТЕЧКА +25', '#00ff00');
+                picked = true;
+            } else if (type === 'armor' && playerStats.armor < playerStats.maxArmor) {
+                playerStats.armor = Math.min(playerStats.armor + 50, playerStats.maxArmor);
+                showPopup('БРОНЯ +50', '#44aaff');
+                picked = true;
+            } else if (type === 'ammo') {
+                playerStats.ammo += 20;
+                showPopup('ПАТРОНЫ +20', '#ffaa00');
+                picked = true;
+            } else if (type === 'shotgun') {
+                if (!playerStats.hasShotgun) {
+                    playerStats.hasShotgun = true;
+                    playerStats.currentWeapon = 1;
+                    playerStats.ammo += 10;
+                    setWeaponSprite(1);
+                    showPopup('ДРОБОВИК ПОЛУЧЕН!', '#ff6600');
+                } else {
+                    playerStats.ammo += 10;
+                    showPopup('ПАТРОНЫ +10', '#ffaa00');
+                }
+                picked = true;
+            } else if (type === 'rifle') {
+                if (!playerStats.hasRifle) {
+                    playerStats.hasRifle = true;
+                    playerStats.currentWeapon = 2;
+                    playerStats.ammo += 30;
+                    setWeaponSprite(2);
+                    showPopup('ВИНТОВКА ПОЛУЧЕНА!', '#aaaaaa');
+                } else {
+                    playerStats.ammo += 30;
+                    showPopup('ПАТРОНЫ +30', '#ffaa00');
+                }
+                picked = true;
+            } else if (type === 'plasma') {
+                if (!playerStats.hasPlasma) {
+                    playerStats.hasPlasma = true;
+                    playerStats.currentWeapon = 3;
+                    playerStats.ammo += 50;
+                    setWeaponSprite(3);
+                    showPopup('ПЛАЗМОГАН ПОЛУЧЕН!', '#00ffff');
+                } else {
+                    playerStats.ammo += 50;
+                    showPopup('ПАТРОНЫ +50', '#ffaa00');
+                }
+                picked = true;
+            }
+            
+            if (picked) {
+                playSound('pickup');
+                
+                const flash = document.getElementById('damage-flash');
+                flash.style.background = 'rgba(0, 255, 0, 0.15)';
+                setTimeout(() => { flash.style.background = 'rgba(0, 255, 0, 0)'; }, 100);
+                
+                score += 10;
+                updateHUD();
+                scene.remove(item);
+                items.splice(i, 1);
+            }
+        }
+    }
+    
+    if (exitPortal && position.distanceTo(exitPortal.position) < 3) {
+        playSound('portal');
+        
+        const elapsed = Math.round((Date.now() - levelStartTime) / 1000);
+        const timeBonus = Math.max(0, 300 - elapsed) * 10;
+        score += timeBonus;
+        
+        // Show level complete
+        gameState = 'VICTORY';
+        if (typeof bgMusic !== 'undefined') bgMusic.pause();
+        document.exitPointerLock();
+        const el = document.getElementById('victory');
+        el.style.display = 'flex';
+        document.getElementById('victory-stats').innerHTML = 
+            `Время: ${elapsed} сек.<br>Бонус: +${timeBonus} очков<br>Счёт: ${score}`;
+        
+        currentLevel++;
+    }
+}
+
+function updatePlayer(delta) {
+    if (gameState !== 'PLAYING') return;
+
+    velocity.x -= velocity.x * 10.0 * delta;
+    velocity.z -= velocity.z * 10.0 * delta;
+    velocity.y -= gravity * delta;
+
+    direction.z = Number(moveForward) - Number(moveBackward);
+    direction.x = Number(moveRight) - Number(moveLeft);
+    direction.normalize(); 
+
+    const currentSpeed = isRunning ? runSpeed : playerSpeed;
+
+    if (moveForward || moveBackward) velocity.z -= direction.z * currentSpeed * delta;
+    if (moveLeft || moveRight) velocity.x -= direction.x * currentSpeed * delta;
+
+    const playerObj = controls.getObject();
+    
+    const oldPos = playerObj.position.clone();
+    
+    controls.moveRight(-velocity.x * delta);
+    controls.moveForward(-velocity.z * delta);
+    
+    const newX = playerObj.position.x;
+    const newZ = playerObj.position.z;
+
+    // Test X movement alone
+    playerObj.position.set(newX, playerObj.position.y, oldPos.z);
+    if (checkCollision(playerObj.position)) {
+        playerObj.position.x = oldPos.x;
+        velocity.x = 0;
+    }
+
+    // Test Z movement alone
+    playerObj.position.set(playerObj.position.x, playerObj.position.y, newZ);
+    if (checkCollision(playerObj.position)) {
+        playerObj.position.z = oldPos.z;
+        velocity.z = 0;
+    }
+
+    // Camera tilt removed as it conflicts with PointerLockControls
+
+    playerObj.position.y += (velocity.y * delta);
+    if (playerObj.position.y < playerHeight) {
+        velocity.y = 0;
+        playerObj.position.y = playerHeight;
+        canJump = true;
+        jumpCount = 0;
+    }
+
+    checkInteractions(playerObj.position);
+
+    // Head/Weapon bobbing + footstep sounds
+    const weaponSprite = document.getElementById('weapon-sprite');
+    const isMoving = (moveForward || moveBackward || moveLeft || moveRight) && canJump;
+    
+    if (isMoving) {
+        const bobSpeed = isRunning ? 15 : 10;
+        bobTimer += delta * bobSpeed;
+        playerObj.position.y = playerHeight + Math.sin(bobTimer) * 0.1;
+        
+        if (weaponSprite) {
+            const swayX = Math.cos(bobTimer) * 15;
+            const swayY = Math.abs(Math.sin(bobTimer)) * 15;
+            weaponSprite.style.transform = `translateX(calc(-50% + ${swayX}px)) translateY(${swayY}px)`;
+        }
+        
+        // Footstep sounds
+        footstepTimer -= delta;
+        if (footstepTimer <= 0) {
+            playSound('footstep');
+            footstepTimer = isRunning ? 0.25 : 0.4;
+        }
+    } else {
+        bobTimer = 0;
+        footstepTimer = 0;
+        if (weaponSprite) {
+            weaponSprite.style.transform = `translateX(-50%) translateY(0px)`;
+        }
+    }
+    
+    if (typeof updateMinimapPlayer === 'function') updateMinimapPlayer();
+}

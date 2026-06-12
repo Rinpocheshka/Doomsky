@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Doomsky 3D</title>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=VT323&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div id="main-menu" class="overlay">
+        <div class="menu-content">
+            <h1>DOOMSKY</h1>
+            <button id="start-btn" style="margin-bottom: 20px;">▶ НАЧАТЬ ИГРУ</button><br>
+            <button id="settings-btn" style="margin-bottom: 20px; font-size: 20px;">НАСТРОЙКИ</button><br>
+            
+            <div class="dropdown-container">
+                <button id="controls-toggle-btn" style="font-size: 20px; width: 100%;">УПРАВЛЕНИЕ ▼</button>
+                <div id="controls-dropdown" class="dropdown-content" style="display: none; background: rgba(0,0,0,0.7); border: 1px solid #ffaa00; margin-top: 10px; padding: 15px; border-radius: 5px; text-align: left;">
+                    <p style="margin: 5px 0;"><kbd>W</kbd> <kbd>A</kbd> <kbd>S</kbd> <kbd>D</kbd> - Движение</p>
+                    <p style="margin: 5px 0;"><kbd>Shift</kbd> - Бег</p>
+                    <p style="margin: 5px 0;"><kbd>Space</kbd> - Прыжок (Двойной)</p>
+                    <p style="margin: 5px 0;"><kbd>ЛКМ</kbd> - Стрельба</p>
+                    <p style="margin: 5px 0;"><kbd>1</kbd>-<kbd>4</kbd> - Оружие</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Settings Menu Overlay -->
+    <div id="settings-menu" class="overlay" style="display:none;">
+        <div class="menu-content">
+            <h2 style="font-size: 40px; margin-bottom: 30px; color: #ffaa00; font-family: 'Orbitron', sans-serif;">НАСТРОЙКИ</h2>
+            <div class="menu-controls">
+                <label for="main-volume-slider">Громкость музыки:</label><br>
+                <input type="range" id="main-volume-slider" min="0" max="1" step="0.01" value="0.5">
+            </div>
+            <button id="close-settings-btn" style="font-size: 20px;">НАЗАД</button>
+        </div>
+    </div>
+
+    <!-- Pause Menu Overlay -->
+    <div id="pause-menu" class="overlay" style="display:none;">
+        <div class="menu-content">
+            <h1 style="margin-bottom: 10px;">ПАУЗА</h1>
+            <div class="menu-controls">
+                <label for="volume-slider">Громкость музыки:</label><br>
+                <input type="range" id="volume-slider" min="0" max="1" step="0.01" value="0.5">
+            </div>
+            <button id="resume-btn" style="margin-bottom:15px; font-size: 24px;">ПРОДОЛЖИТЬ</button><br>
+            <button id="quit-btn" style="font-size: 24px;">В ГЛАВНОЕ МЕНЮ</button>
+        </div>
+    </div>
+
+    <!-- Game Over Overlay -->
+    <div id="game-over" class="overlay" style="display:none;">
+        <h1 class="dead-title">ВЫ ПОГИБЛИ</h1>
+        <div id="death-stats"></div>
+        <button id="restart-btn">↻ НАЧАТЬ ЗАНОВО</button>
+    </div>
+
+    <!-- Victory Overlay -->
+    <div id="victory" class="overlay" style="display:none;">
+        <h1 class="victory-title">УРОВЕНЬ ПРОЙДЕН!</h1>
+        <div id="victory-stats"></div>
+        <button id="next-level-btn">СЛЕДУЮЩИЙ УРОВЕНЬ →</button>
+    </div>
+
+    <!-- Final Victory -->
+    <div id="final-victory" class="overlay" style="display:none;">
+        <h1 class="victory-title">ПОБЕДА!</h1>
+        <p>Вы прошли все уровни!</p>
+        <div id="final-stats"></div>
+        <button id="restart-full-btn">ИГРАТЬ ЗАНОВО</button>
+    </div>
+
+    <!-- Game UI HUD -->
+    <div id="ui">
+        <!-- Crosshair -->
+        <div id="crosshair">
+            <div class="ch-dot"></div>
+            <div class="ch-line ch-top"></div>
+            <div class="ch-line ch-bottom"></div>
+            <div class="ch-line ch-left"></div>
+            <div class="ch-line ch-right"></div>
+        </div>
+        
+        <!-- Minimap -->
+        <canvas id="minimap" width="180" height="180"></canvas>
+        
+        <!-- Enemy Health Bar Container -->
+        <div id="enemy-ui-container"></div>
+
+        <!-- Kill counter -->
+        <div id="kill-counter">ВРАГИ: <span id="enemies-left">0</span></div>
+
+        <!-- Popup Messages -->
+        <div id="popup-container"></div>
+        
+        <!-- Weapon Sprite -->
+        <img id="weapon-sprite" src="assets/pistol.png" alt="weapon">
+        
+        <!-- Bottom HUD -->
+        <div id="hud-panel">
+            <div class="hud-box" id="hud-weapon">
+                <span class="hud-label">ОРУЖИЕ</span>
+                <span id="weapon-name" class="hud-value weapon-val">ПИСТОЛЕТ</span>
+            </div>
+            <div class="hud-box" id="hud-health">
+                <span class="hud-label">ЗДОРОВЬЕ</span>
+                <div class="hud-bar-container">
+                    <div id="health-bar" class="hud-bar health-bar-fill"></div>
+                </div>
+                <span id="health-value" class="hud-value health-val">100</span>
+            </div>
+            <div class="hud-box" id="hud-armor">
+                <span class="hud-label">БРОНЯ</span>
+                <div class="hud-bar-container">
+                    <div id="armor-bar" class="hud-bar armor-bar-fill"></div>
+                </div>
+                <span id="armor-value" class="hud-value armor-val">0</span>
+            </div>
+            <div class="hud-box" id="hud-ammo">
+                <span class="hud-label">ПАТРОНЫ</span>
+                <span id="ammo-value" class="hud-value ammo-val">∞</span>
+            </div>
+            <div class="hud-box" id="hud-score">
+                <span class="hud-label">СЧЁТ</span>
+                <span id="score-value" class="hud-value score-val">0</span>
+            </div>
+        </div>
+        
+        <!-- Screen flash effects -->
+        <div id="damage-flash"></div>
+    </div>
+    
+    <!-- Three.js -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/PointerLockControls.js"></script>
+    
+    <!-- Game Modules -->
+    <script src="globals.js"></script>
+    <script src="level.js"></script>
+    <script src="player.js"></script>
+    <script src="enemies.js"></script>
+    <script src="weapons.js"></script>
+    <script src="main.js"></script>
+</body>
+</html>
