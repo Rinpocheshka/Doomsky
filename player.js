@@ -27,23 +27,19 @@ function initPlayer() {
 // ── CHEAT CODES (Easter Eggs) ──
 let cheatBuffer = '';
 const CHEATS = {
-    'iddqd': () => {
+    'boom': () => {
         playerStats.health = 999;
         playerStats.maxHealth = 999;
         playerStats.armor = 999;
         playerStats.maxArmor = 999;
         playerStats.lives = 99;
-        showPopup('РЕЖИМ БОГА', '#ff0000');
-        updateHUD();
-    },
-    'idkfa': () => {
         playerStats.hasShotgun = true;
         playerStats.hasRifle = true;
         playerStats.hasPlasma = true;
         playerStats.ammo = 999;
         setWeaponSprite(3);
         playerStats.currentWeapon = 3;
-        showPopup('ВСЁ ОРУЖИЕ И ПАТРОНЫ', '#ffff00');
+        showPopup('БОЖЕСТВЕННЫЙ АРСЕНАЛ!', '#ff00ff');
         updateHUD();
     }
 };
