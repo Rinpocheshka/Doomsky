@@ -115,7 +115,8 @@ const onKeyDown = function (event) {
         case 'KeyS': moveBackward = true; break;
         case 'ArrowRight':
         case 'KeyD': moveRight = true; break;
-        case 'ShiftLeft': isRunning = true; break;
+        case 'ShiftLeft':
+        case 'ShiftRight': isRunning = true; break;
         case 'Space':
             if (canJump === true) {
                 velocity.y = jumpVelocity;
@@ -166,12 +167,24 @@ const onKeyUp = function (event) {
         case 'KeyS': moveBackward = false; break;
         case 'ArrowRight':
         case 'KeyD': moveRight = false; break;
-        case 'ShiftLeft': isRunning = false; break;
+        case 'ShiftLeft':
+        case 'ShiftRight': isRunning = false; break;
     }
 };
 
 document.addEventListener('keydown', onKeyDown);
 document.addEventListener('keyup', onKeyUp);
+
+// Reset all movement flags when window loses focus (prevents stuck keys)
+function resetMovementState() {
+    moveForward = false;
+    moveBackward = false;
+    moveLeft = false;
+    moveRight = false;
+    isRunning = false;
+}
+window.addEventListener('blur', resetMovementState);
+document.addEventListener('visibilitychange', () => { if (document.hidden) resetMovementState(); });
 
 function checkCollision(position) {
     if (typeof getLevelWalls === 'function') {

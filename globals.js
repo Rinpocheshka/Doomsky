@@ -62,7 +62,21 @@ function playSound(type) {
             const s = audioCtx.createBufferSource(); s.buffer = buf;
             const g = audioCtx.createGain(); g.gain.setValueAtTime(0.4, audioCtx.currentTime);
             g.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.08);
-            s.connect(g); g.connect(audioCtx.destination); s.start();
+            s.connect(g); g.connect(audioCtx.destination);
+            s.start(); s.stop(audioCtx.currentTime + 0.08);
+            break;
+        }
+        case 'alert': {
+            const osc = audioCtx.createOscillator();
+            osc.type = 'square';
+            osc.frequency.setValueAtTime(150, audioCtx.currentTime);
+            osc.frequency.exponentialRampToValueAtTime(400, audioCtx.currentTime + 0.15);
+            osc.frequency.exponentialRampToValueAtTime(100, audioCtx.currentTime + 0.3);
+            const g = audioCtx.createGain();
+            g.gain.setValueAtTime(0.35, audioCtx.currentTime);
+            g.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.3);
+            osc.connect(g); g.connect(audioCtx.destination);
+            osc.start(); osc.stop(audioCtx.currentTime + 0.3);
             break;
         }
         case 'enemy_die': {
@@ -143,12 +157,12 @@ function loadTransparentTexture(url, callback) {
 
 // ──── Particle System (for enemy death) ────
 const particles = [];
+const sharedParticleGeo = new THREE.SphereGeometry(0.1, 4, 4); // Shared — no per-particle alloc
 
 function spawnParticles(position, count, color) {
     for (let i = 0; i < count; i++) {
-        const geo = new THREE.SphereGeometry(0.1, 4, 4);
-        const mat = new THREE.MeshBasicMaterial({ color: color });
-        const p = new THREE.Mesh(geo, mat);
+        const mat = new THREE.MeshBasicMaterial({ color: color, transparent: true });
+        const p = new THREE.Mesh(sharedParticleGeo, mat);
         p.position.copy(position);
         p.userData.velocity = new THREE.Vector3(
             (Math.random() - 0.5) * 10,
@@ -171,8 +185,7 @@ function updateParticles(delta) {
         p.material.transparent = true;
         if (p.userData.life <= 0) {
             scene.remove(p);
-            p.geometry.dispose();
-            p.material.dispose();
+            p.material.dispose(); // geometry is shared, don't dispose it
             particles.splice(i, 1);
         }
     }

@@ -2,6 +2,7 @@
 
 const TILE_SIZE = 4;
 let walls = [];
+let fakeWalls = []; // Tracked separately — no collision but must be cleaned up
 let exitPortal = null;
 let portalLight = null;
 let floorMesh = null;
@@ -11,6 +12,7 @@ const wallGeometry = new THREE.BoxGeometry(TILE_SIZE, TILE_SIZE, TILE_SIZE);
 const wallMaterial = new THREE.MeshStandardMaterial({ color: 0x555555, roughness: 0.8 });
 const pillarGeometry = new THREE.CylinderGeometry(1.5, 1.5, TILE_SIZE, 16);
 const crateGeometry = new THREE.BoxGeometry(2.5, 2.5, 2.5);
+const crateMaterial = new THREE.MeshStandardMaterial({ color: 0x7a4f2b, roughness: 0.9 });
 
 const spriteMaterials = {};
 
@@ -218,23 +220,33 @@ function loadTextures() {
 loadTextures();
 
 function clearLevel() {
-    walls.forEach(w => scene.remove(w));
+    walls.forEach(w => { scene.remove(w); if (w.material !== wallMaterial) w.material.dispose(); });
     walls = [];
+    fakeWalls.forEach(w => scene.remove(w));
+    fakeWalls = [];
     if (typeof getEnemies === 'function') {
         const enems = getEnemies();
         enems.forEach(e => {
             scene.remove(e);
+            e.material.dispose();
             if(e.userData.ui) e.userData.ui.remove();
         });
         enems.length = 0; 
     }
-    items.forEach(i => scene.remove(i));
+    // Clear any orphaned enemy health bar DOM elements
+    const uiContainer = document.getElementById('enemy-ui-container');
+    if (uiContainer) uiContainer.innerHTML = '';
+    // Hide boss HP bar
+    const bossBar = document.getElementById('boss-hpbar-container');
+    if (bossBar) bossBar.style.display = 'none';
+    
+    items.forEach(i => { scene.remove(i); i.material.dispose(); });
     items.length = 0;
     
     levelLights.forEach(l => scene.remove(l));
     levelLights.length = 0;
     
-    if (exitPortal) { scene.remove(exitPortal); exitPortal = null; }
+    if (exitPortal) { scene.remove(exitPortal); exitPortal.geometry.dispose(); exitPortal.material.dispose(); exitPortal = null; }
     if (portalLight) { scene.remove(portalLight); portalLight = null; }
 }
 
@@ -251,6 +263,13 @@ function loadLevel(index) {
     
     clearLevel();
     const map = levels[index];
+    
+    // Level fade-in transition
+    const fade = document.getElementById('level-fade');
+    if (fade) {
+        fade.classList.add('active');
+        setTimeout(() => fade.classList.remove('active'), 600);
+    }
     
     // Level-specific wall colors and atmosphere
     if (index === 0) {
@@ -286,6 +305,9 @@ function loadLevel(index) {
         ceilingMesh.position.y = TILE_SIZE;
         scene.add(ceilingMesh);
     }
+    // Late-load fix: update materials if they loaded after mesh creation
+    if (floorMat && floorMesh.material !== floorMat) { floorMesh.material.dispose(); floorMesh.material = floorMat; }
+    if (ceilMat && ceilingMesh.material !== ceilMat) { ceilingMesh.material.dispose(); ceilingMesh.material = ceilMat; }
 
     const mapWidth = map[0].length;
     const mapHeight = map.length;
@@ -337,6 +359,7 @@ function loadLevel(index) {
                     fakeWall.castShadow = true;
                     fakeWall.receiveShadow = true;
                     scene.add(fakeWall);
+                    fakeWalls.push(fakeWall); // Track for cleanup
                 } else if (val === 14) { 
                     // Pillar
                     const pillar = new THREE.Mesh(pillarGeometry, wallMaterial);
@@ -347,8 +370,7 @@ function loadLevel(index) {
                     walls.push(pillar);
                 } else if (val === 15) { 
                     // Crate — brown, solid
-                    const crateMat = new THREE.MeshStandardMaterial({ color: 0x7a4f2b, roughness: 0.9 });
-                    const crate = new THREE.Mesh(crateGeometry, crateMat);
+                    const crate = new THREE.Mesh(crateGeometry, crateMaterial);
                     crate.position.set(px, 1.25, pz);
                     crate.castShadow = true;
                     crate.receiveShadow = true;
@@ -416,9 +438,11 @@ function getLevelWalls() {
     return walls;
 }
 
-function spawnItemSprite(x, z, type) {
+function spawnItemSprite(x, z, type, _retries = 0) {
     if (!spriteMaterials[type]) {
-        setTimeout(() => spawnItemSprite(x, z, type), 100);
+        if (_retries < 50) { // Max 5 seconds of retrying
+            setTimeout(() => spawnItemSprite(x, z, type, _retries + 1), 100);
+        }
         return;
     }
     const sprite = new THREE.Sprite(spriteMaterials[type].clone());
@@ -503,24 +527,71 @@ function drawMinimap(map) {
     }
 }
 
+// Offscreen canvas for static minimap cache
+let _minimapStaticCanvas = null;
+let _minimapCachedLevel = -1;
+
+function _cacheStaticMinimap(map) {
+    _minimapStaticCanvas = document.createElement('canvas');
+    _minimapStaticCanvas.width = 180;
+    _minimapStaticCanvas.height = 180;
+    const ctx = _minimapStaticCanvas.getContext('2d');
+    const cellW = 180 / map[0].length;
+    const cellH = 180 / map.length;
+    
+    for (let z = 0; z < map.length; z++) {
+        for (let x = 0; x < map[0].length; x++) {
+            const val = map[z][x];
+            if (val === 1 || val === 13 || val === 14) {
+                ctx.fillStyle = '#445544';
+                ctx.fillRect(x * cellW, z * cellH, cellW, cellH);
+            } else if (val === 15) {
+                ctx.fillStyle = '#7a4f2b';
+                ctx.fillRect(x * cellW, z * cellH, cellW, cellH);
+            } else if (val === 9) {
+                ctx.fillStyle = '#00ff88';
+                ctx.fillRect(x * cellW, z * cellH, cellW, cellH);
+            } else if (val === 7) {
+                ctx.fillStyle = 'rgba(255,100,0,0.5)';
+                ctx.fillRect(x * cellW, z * cellH, cellW, cellH);
+            } else if (val === 8) {
+                ctx.fillStyle = 'rgba(50,100,255,0.5)';
+                ctx.fillRect(x * cellW, z * cellH, cellW, cellH);
+            } else if (val === 17) {
+                ctx.fillStyle = 'rgba(255,0,0,0.8)';
+                ctx.fillRect(x * cellW, z * cellH, cellW, cellH);
+            } else if (val === 12) {
+                ctx.fillStyle = 'rgba(0,255,0,0.3)';
+                ctx.fillRect(x * cellW, z * cellH, cellW, cellH);
+            }
+        }
+    }
+    _minimapCachedLevel = currentLevel;
+}
+
 function updateMinimapPlayer() {
     const canvas = document.getElementById('minimap');
     if (!canvas || !levels[currentLevel]) return;
     const ctx = canvas.getContext('2d');
+    const map = levels[currentLevel];
     
-    drawMinimap(levels[currentLevel]);
+    // Cache static layer if needed
+    if (_minimapCachedLevel !== currentLevel) _cacheStaticMinimap(map);
     
-    const mapWidth = levels[currentLevel][0].length;
-    const mapHeight = levels[currentLevel].length;
+    // Blit cached static layer
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    if (_minimapStaticCanvas) ctx.drawImage(_minimapStaticCanvas, 0, 0);
+    
+    const mapWidth = map[0].length;
+    const mapHeight = map.length;
     const offsetX = (mapWidth * TILE_SIZE) / 2;
     const offsetZ = (mapHeight * TILE_SIZE) / 2;
-    
-    const px = controls.getObject().position.x + offsetX;
-    const pz = controls.getObject().position.z + offsetZ;
     
     const cellW = canvas.width / mapWidth;
     const cellH = canvas.height / mapHeight;
     
+    const px = controls.getObject().position.x + offsetX;
+    const pz = controls.getObject().position.z + offsetZ;
     const mapX = (px / TILE_SIZE) * cellW;
     const mapZ = (pz / TILE_SIZE) * cellH;
     
@@ -546,7 +617,7 @@ function updateMinimapPlayer() {
         ctx.fill();
     });
     
-    // Player as bright green triangle pointing in view direction
+    // Player as bright green dot
     ctx.fillStyle = '#00ff88';
     ctx.beginPath();
     ctx.arc(mapX, mapZ, 3.5, 0, Math.PI * 2);

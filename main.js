@@ -2,6 +2,7 @@
 
 function init() {
     renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2)); // HiDPI support, cap at 2x
     renderer.shadowMap.enabled = true;
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
@@ -162,8 +163,9 @@ function nextLevel() {
     document.getElementById('victory').style.display = 'none';
     gameState = 'PLAYING';
     
-    // Keep weapons and score, refresh health, guarantee minimum ammo
+    // Keep weapons and score, refresh health + armor, guarantee minimum ammo
     playerStats.health = playerStats.maxHealth;
+    playerStats.armor = Math.max(playerStats.armor, 25); // Never enter next level with 0 armor
     playerStats.ammo = Math.max(playerStats.ammo, 20); // Never enter next level broke
     if (typeof updateHUD === 'function') updateHUD();
     
@@ -195,10 +197,25 @@ function onWindowResize() {
     renderer.setSize(window.innerWidth, window.innerHeight);
 }
 
+// FPS counter
+let _fpsFrames = 0;
+let _fpsTime = 0;
+
 function animate() {
     requestAnimationFrame(animate);
     
     const delta = Math.min(clock.getDelta(), 0.1);
+
+    // FPS counter update (~2x per second)
+    _fpsFrames++;
+    _fpsTime += delta;
+    if (_fpsTime >= 0.5) {
+        const fps = Math.round(_fpsFrames / _fpsTime);
+        const el = document.getElementById('fps-counter');
+        if (el) el.textContent = `${fps} FPS`;
+        _fpsFrames = 0;
+        _fpsTime = 0;
+    }
 
     if (gameState === 'PLAYING') {
         if (typeof updatePlayer === 'function') updatePlayer(delta);

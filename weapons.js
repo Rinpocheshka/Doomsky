@@ -3,6 +3,7 @@
 let isShooting = false;
 const raycaster = new THREE.Raycaster();
 const tracers = [];
+const _screenCenter = new THREE.Vector2(0, 0); // Reused per shot
 
 // Track muzzle light to prevent accumulation on rapid fire
 let activeMuzzleLight = null;
@@ -224,6 +225,7 @@ function shoot() {
         damage = 60;
         cooldown = 550;
         playShotgunSound();
+        screenShake(0.4, 150);
     } else if (playerStats.currentWeapon === 2) { // Rifle
         playerStats.ammo--;
         damage = 25;
@@ -235,12 +237,13 @@ function shoot() {
         cooldown = 700;
         flashColor = 'rgba(0,200,255,1)';
         playPlasmaSound();
+        screenShake(0.3, 200);
     } else {
         playPistolSound();
     }
 
     // ── Single raycaster call — results reused for tracer AND hit detection ──
-    raycaster.setFromCamera(new THREE.Vector2(0, 0), camera);
+    raycaster.setFromCamera(_screenCenter, camera);
     const enems = typeof getEnemies === 'function' ? getEnemies() : [];
     const levelWalls = typeof getLevelWalls === 'function' ? getLevelWalls() : [];
     const allIntersects = raycaster.intersectObjects([...enems, ...levelWalls]);
@@ -303,6 +306,7 @@ function shoot() {
             }, 80);
             
             playSound('hit');
+            showHitMarker();
             // Blood particles
             spawnParticles(hitPoint, 5, 0xff0000);
 
@@ -389,4 +393,34 @@ function updateWeapons(delta) {
             tracers.splice(i, 1);
         }
     }
+}
+
+// ── Hit Marker ──
+function showHitMarker() {
+    const marker = document.getElementById('hit-marker');
+    if (!marker) return;
+    marker.style.opacity = '1';
+    marker.style.transform = 'translate(-50%, -50%) scale(1.2)';
+    setTimeout(() => {
+        marker.style.opacity = '0';
+        marker.style.transform = 'translate(-50%, -50%) scale(0.8)';
+    }, 120);
+}
+
+// ── Screen Shake ──
+function screenShake(intensity, duration) {
+    const playerObj = controls.getObject();
+    const origY = playerObj.position.y;
+    const steps = Math.ceil(duration / 16);
+    let step = 0;
+    const interval = setInterval(() => {
+        step++;
+        const decay = 1 - step / steps;
+        playerObj.position.x += (Math.random() - 0.5) * intensity * decay;
+        playerObj.position.y = origY + (Math.random() - 0.5) * intensity * decay * 0.5;
+        if (step >= steps) {
+            clearInterval(interval);
+            playerObj.position.y = origY;
+        }
+    }, 16);
 }

@@ -55,7 +55,7 @@ function spawnEnemy(x, z, overrideType = null) {
 
     const matIdx = Math.min(typeLvl, enemyMaterials.length - 1);
     if (!enemyMaterials[matIdx]) {
-        setTimeout(() => spawnEnemy(x, z), 100);
+        setTimeout(() => spawnEnemy(x, z, overrideType), 100);
         return;
     }
     
@@ -124,10 +124,12 @@ function updateEnemies(delta) {
 
     const playerPos = controls.getObject().position;
 
+    const _dirToPlayer = new THREE.Vector3(); // reusable temp
+
     enemies.forEach(enemy => {
         const dist = enemy.position.distanceTo(playerPos);
-        const dirToPlayer = new THREE.Vector3().subVectors(playerPos, enemy.position).normalize();
-        dirToPlayer.y = 0;
+        _dirToPlayer.subVectors(playerPos, enemy.position).normalize();
+        _dirToPlayer.y = 0;
 
         const ud = enemy.userData;
         
@@ -139,7 +141,7 @@ function updateEnemies(delta) {
                 // Alert sound on first detection
                 if (ud.alertTimer <= 0) {
                     ud.alertTimer = 30;
-                    playSound('enemy_die');
+                    playSound('alert');
                 }
                 // Show boss HP bar on first detection
                 if (ud.type === 3) {
@@ -172,19 +174,19 @@ function updateEnemies(delta) {
             if (ud.moveTimer <= 0) {
                 const r = Math.random();
                 if (r < (0.55 - ud.retreatChance)) {
-                    ud.direction.copy(dirToPlayer);
+                    ud.direction.copy(_dirToPlayer);
                     ud.state = 'chase';
                     ud.moveTimer = 0.8 + Math.random() * 1.5;
                 } else if (r < 0.85) {
                     // Strafe left or right around the player
-                    const cross = new THREE.Vector3(0, 1, 0).cross(dirToPlayer).normalize();
+                    const cross = new THREE.Vector3(0, 1, 0).cross(_dirToPlayer).normalize();
                     if (Math.random() > 0.5) cross.negate();
                     ud.direction.copy(cross);
                     ud.state = 'strafe';
                     ud.moveTimer = 0.6 + Math.random() * 1.2;
                 } else {
                     // Brief tactical retreat
-                    ud.direction.copy(dirToPlayer).negate();
+                    ud.direction.copy(_dirToPlayer).negate();
                     ud.state = 'retreat';
                     ud.moveTimer = 0.4 + Math.random() * 0.8;
                 }
@@ -194,7 +196,7 @@ function updateEnemies(delta) {
             if (ud.state !== 'retreat') {
                 // Blend movement direction toward player a bit for chase/strafe
                 if (ud.state === 'chase') {
-                    ud.direction.lerp(dirToPlayer, 3 * delta).normalize();
+                    ud.direction.lerp(_dirToPlayer, 3 * delta).normalize();
                 }
             }
 
