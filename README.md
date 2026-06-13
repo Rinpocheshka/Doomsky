@@ -37,4 +37,6 @@ To run the game locally, you need a local web server (to avoid CORS issues with 
 - Vanilla JavaScript, HTML5, CSS3
 
 ---
-*Created by Messsir and Rinpocheshka.*
+*Created by Messsir.*
+
+boom
