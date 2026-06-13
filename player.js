@@ -24,6 +24,42 @@ function initPlayer() {
     updateHUD();
 }
 
+// ── CHEAT CODES (Easter Eggs) ──
+let cheatBuffer = '';
+const CHEATS = {
+    'iddqd': () => {
+        playerStats.health = 999;
+        playerStats.maxHealth = 999;
+        playerStats.armor = 999;
+        playerStats.maxArmor = 999;
+        showPopup('РЕЖИМ БОГА', '#ff0000');
+        updateHUD();
+    },
+    'idkfa': () => {
+        playerStats.hasShotgun = true;
+        playerStats.hasRifle = true;
+        playerStats.hasPlasma = true;
+        playerStats.ammo = 999;
+        setWeaponSprite(3);
+        playerStats.currentWeapon = 3;
+        showPopup('ВСЁ ОРУЖИЕ И ПАТРОНЫ', '#ffff00');
+        updateHUD();
+    }
+};
+
+window.addEventListener('keydown', (e) => {
+    if (e.key && e.key.length === 1) {
+        cheatBuffer += e.key.toLowerCase();
+        if (cheatBuffer.length > 10) cheatBuffer = cheatBuffer.substring(cheatBuffer.length - 10);
+        for (let code in CHEATS) {
+            if (cheatBuffer.endsWith(code)) {
+                CHEATS[code]();
+                cheatBuffer = '';
+            }
+        }
+    }
+});
+
 function updateHUD() {
     const healthEl = document.getElementById('health-value');
     const armorEl = document.getElementById('armor-value');
@@ -186,19 +222,27 @@ function resetMovementState() {
 window.addEventListener('blur', resetMovementState);
 document.addEventListener('visibilitychange', () => { if (document.hidden) resetMovementState(); });
 
-function checkCollision(position) {
+function resolveCollision(position) {
     if (typeof getLevelWalls === 'function') {
         const walls = getLevelWalls();
         for (let i = 0; i < walls.length; i++) {
             const wall = walls[i];
-            const dx = Math.abs(position.x - wall.position.x);
-            const dz = Math.abs(position.z - wall.position.z);
-            if (dx < 2.5 && dz < 2.5) {
-                return true;
+            const dx = position.x - wall.position.x;
+            const dz = position.z - wall.position.z;
+            const absDx = Math.abs(dx);
+            const absDz = Math.abs(dz);
+            if (absDx < 2.5 && absDz < 2.5) {
+                // Push player out on the axis of least penetration
+                const overlapX = 2.5 - absDx;
+                const overlapZ = 2.5 - absDz;
+                if (overlapX < overlapZ) {
+                    position.x += dx > 0 ? overlapX : -overlapX;
+                } else {
+                    position.z += dz > 0 ? overlapZ : -overlapZ;
+                }
             }
         }
     }
-    return false;
 }
 
 function checkInteractions(position) {
@@ -311,27 +355,11 @@ function updatePlayer(delta) {
 
     const playerObj = controls.getObject();
     
-    const oldPos = playerObj.position.clone();
-    
     controls.moveRight(-velocity.x * delta);
     controls.moveForward(-velocity.z * delta);
     
-    const newX = playerObj.position.x;
-    const newZ = playerObj.position.z;
-
-    // Test X movement alone
-    playerObj.position.set(newX, playerObj.position.y, oldPos.z);
-    if (checkCollision(playerObj.position)) {
-        playerObj.position.x = oldPos.x;
-        velocity.x = 0;
-    }
-
-    // Test Z movement alone
-    playerObj.position.set(playerObj.position.x, playerObj.position.y, newZ);
-    if (checkCollision(playerObj.position)) {
-        playerObj.position.z = oldPos.z;
-        velocity.z = 0;
-    }
+    // Smooth collision resolution
+    resolveCollision(playerObj.position);
 
     // Camera tilt removed as it conflicts with PointerLockControls
 
