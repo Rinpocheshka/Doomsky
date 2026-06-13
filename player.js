@@ -48,8 +48,8 @@ const CHEATS = {
 };
 
 window.addEventListener('keydown', (e) => {
-    if (e.key && e.key.length === 1) {
-        cheatBuffer += e.key.toLowerCase();
+    if (e.code && e.code.startsWith('Key')) {
+        cheatBuffer += e.code.replace('Key', '').toLowerCase();
         if (cheatBuffer.length > 10) cheatBuffer = cheatBuffer.substring(cheatBuffer.length - 10);
         for (let code in CHEATS) {
             if (cheatBuffer.endsWith(code)) {
