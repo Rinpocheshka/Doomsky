@@ -67,12 +67,43 @@
         <button id="next-level-btn">СЛЕДУЮЩИЙ УРОВЕНЬ →</button>
     </div>
 
-    <!-- Final Victory -->
+    <!-- Final Victory (Cinematic) -->
     <div id="final-victory" class="overlay" style="display:none;">
-        <h1 class="victory-title">ПОБЕДА!</h1>
-        <p>Вы прошли все уровни!</p>
-        <div id="final-stats"></div>
-        <button id="restart-full-btn">ИГРАТЬ ЗАНОВО</button>
+        <div id="cinematic-container" style="display:none;">
+            <div id="cine-text-1" class="cine-text">ПОСЛЕДНИЙ ДЕМОН ПОВЕРЖЕН</div>
+            <div id="cine-text-2" class="cine-text">ВРАТА АДА ЗАКРЫТЫ НАВСЕГДА</div>
+            <div id="cine-text-3" class="cine-text">И КАК ИСТИННЫЙ ГЕРОЙ...</div>
+            <div id="cine-text-4" class="cine-text">ТЫ ПОЛУЧАЕШЬ СВОЮ НАГРАДУ</div>
+            
+            <div id="credits-container">
+                <div id="alt-girl-reveal">
+                    <img src="assets/alt_girl.png" alt="Альтушка с Госуслуг">
+                    <div class="alt-girl-title">АЛЬТУШКА С ГОСУСЛУГ ПОЛУЧЕНА</div>
+                </div>
+                
+                <div class="credit-block">
+                    <div class="credit-role">LEAD DEVELOPER</div>
+                    <div class="credit-name">Rinpocheshka</div>
+                </div>
+                <div class="credit-block">
+                    <div class="credit-role">LEVEL DESIGN</div>
+                    <div class="credit-name">Messsir</div>
+                </div>
+                <div class="credit-block">
+                    <div class="credit-role">DEMON SLAYER</div>
+                    <div class="credit-name">ТЫ</div>
+                </div>
+                <div class="credit-block">
+                    <div class="credit-role">СКУФЫ</div>
+                    <div class="credit-name">УНИЧТОЖЕНЫ</div>
+                </div>
+                
+                <div style="font-size: 50px; color: #ffaa00; margin-top: 50px; text-shadow: 0 0 20px #ffaa00;">THANKS FOR PLAYING</div>
+                
+                <div id="final-stats" style="margin-top: 40px;"></div>
+                <button id="restart-full-btn" style="margin-top: 40px;">ИГРАТЬ ЗАНОВО</button>
+            </div>
+        </div>
     </div>
 
     <!-- Game UI HUD -->

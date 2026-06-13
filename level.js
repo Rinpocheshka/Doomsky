@@ -254,10 +254,36 @@ function loadLevel(index) {
     if (index >= levels.length) {
         gameState = 'FINAL_VICTORY';
         document.exitPointerLock();
-        const el = document.getElementById('final-victory');
-        el.style.display = 'flex';
+        
         document.getElementById('final-stats').innerHTML = 
             `Убито врагов: ${totalKills}<br>Очки: ${score}`;
+            
+        const el = document.getElementById('final-victory');
+        el.style.display = 'flex';
+        
+        const cineContainer = document.getElementById('cinematic-container');
+        cineContainer.style.display = 'flex';
+        
+        setTimeout(() => { document.getElementById('cine-text-1').classList.add('active'); }, 1000);
+        setTimeout(() => { document.getElementById('cine-text-1').classList.remove('active'); }, 4000);
+        
+        setTimeout(() => { document.getElementById('cine-text-2').classList.add('active'); }, 5000);
+        setTimeout(() => { document.getElementById('cine-text-2').classList.remove('active'); }, 8000);
+        
+        setTimeout(() => { document.getElementById('cine-text-3').classList.add('active'); }, 9000);
+        setTimeout(() => { document.getElementById('cine-text-3').classList.remove('active'); }, 12000);
+        
+        setTimeout(() => { document.getElementById('cine-text-4').classList.add('active'); }, 13000);
+        setTimeout(() => { document.getElementById('cine-text-4').classList.remove('active'); }, 16000);
+        
+        setTimeout(() => {
+            const credits = document.getElementById('credits-container');
+            credits.style.display = 'flex';
+            setTimeout(() => {
+                credits.style.transform = 'translateY(calc(-100% - 20vh))';
+            }, 100);
+        }, 17000);
+
         return;
     }
     

@@ -41,6 +41,11 @@ const CHEATS = {
         playerStats.currentWeapon = 3;
         showPopup('БОЖЕСТВЕННЫЙ АРСЕНАЛ!', '#ff00ff');
         updateHUD();
+    },
+    'win': () => {
+        if (typeof loadLevel === 'function' && typeof levels !== 'undefined') {
+            loadLevel(levels.length);
+        }
     }
 };
 

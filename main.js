@@ -133,6 +133,14 @@ function startGame() {
     document.getElementById('final-victory').style.display = 'none';
     document.getElementById('pause-menu').style.display = 'none';
     
+    const cineContainer = document.getElementById('cinematic-container');
+    if (cineContainer) {
+        cineContainer.style.display = 'none';
+        document.getElementById('credits-container').style.display = 'none';
+        document.getElementById('credits-container').style.transform = 'translateY(0)';
+        document.querySelectorAll('.cine-text').forEach(el => el.classList.remove('active'));
+    }
+    
     gameState = 'PLAYING';
     currentLevel = 0;
     score = 0;
