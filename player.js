@@ -32,6 +32,7 @@ const CHEATS = {
         playerStats.maxHealth = 999;
         playerStats.armor = 999;
         playerStats.maxArmor = 999;
+        playerStats.lives = 99;
         showPopup('РЕЖИМ БОГА', '#ff0000');
         updateHUD();
     },
@@ -69,10 +70,12 @@ function updateHUD() {
     const healthBar = document.getElementById('health-bar');
     const armorBar = document.getElementById('armor-bar');
     
-    if (healthEl) healthEl.innerText = playerStats.health;
-    if (armorEl) armorEl.innerText = playerStats.armor;
-    if (ammoEl) ammoEl.innerText = playerStats.currentWeapon === 0 ? '∞' : playerStats.ammo;
-    if (scoreEl) scoreEl.innerText = score;
+    const livesEl = document.getElementById('lives-value');
+    if (healthEl) healthEl.textContent = playerStats.health;
+    if (armorEl) armorEl.textContent = playerStats.armor;
+    if (ammoEl) ammoEl.textContent = playerStats.currentWeapon === 0 ? '∞' : playerStats.ammo;
+    if (scoreEl) scoreEl.textContent = score;
+    if (livesEl) livesEl.textContent = '❤️'.repeat(playerStats.lives) || '0';
     
     let wName = 'ПИСТОЛЕТ';
     if (playerStats.currentWeapon === 1) wName = 'ДРОБОВИК';
@@ -130,13 +133,29 @@ function takeDamage(amount) {
     controls.getObject().position.y += (Math.random() - 0.5) * 0.3;
     
     if (playerStats.health <= 0) {
-        gameState = 'GAMEOVER';
-        if (typeof bgMusic !== 'undefined') bgMusic.pause();
-        document.exitPointerLock();
-        const el = document.getElementById('game-over');
-        el.style.display = 'flex';
-        document.getElementById('death-stats').innerHTML = 
-            `Убито врагов: ${totalKills}<br>Очки: ${score}`;
+        if (playerStats.lives > 0) {
+            // Resurrection
+            playerStats.lives -= 1;
+            playerStats.health = playerStats.maxHealth;
+            updateHUD();
+            
+            showPopup('ВОСКРЕШЕНИЕ!', '#ffffff');
+            const rFlash = document.getElementById('resurrection-flash');
+            if (rFlash) {
+                rFlash.style.opacity = '1';
+                setTimeout(() => rFlash.style.opacity = '0', 100);
+            }
+            // Give brief invulnerability (could be added) or simply restore health.
+        } else {
+            // Real Game Over
+            gameState = 'GAMEOVER';
+            if (typeof bgMusic !== 'undefined') bgMusic.pause();
+            document.exitPointerLock();
+            const el = document.getElementById('game-over');
+            el.style.display = 'flex';
+            document.getElementById('death-stats').innerHTML = 
+                `Убито врагов: ${totalKills}<br>Очки: ${score}`;
+        }
     }
 }
 

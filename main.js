@@ -116,6 +116,7 @@ function resetPlayerStats() {
     playerStats.hasPlasma = currentLevel >= 3;
     
     playerStats.currentWeapon = 0;
+    playerStats.lives = 3;
     if (playerStats.hasShotgun) { playerStats.currentWeapon = 1; playerStats.ammo += 10; }
     if (playerStats.hasRifle) { playerStats.currentWeapon = 2; playerStats.ammo += 20; }
     if (playerStats.hasPlasma) { playerStats.currentWeapon = 3; playerStats.ammo += 50; }
@@ -163,10 +164,11 @@ function nextLevel() {
     document.getElementById('victory').style.display = 'none';
     gameState = 'PLAYING';
     
-    // Keep weapons and score, refresh health + armor, guarantee minimum ammo
+    // Keep weapons and score, refresh health + armor, guarantee minimum ammo, reward +1 life
     playerStats.health = playerStats.maxHealth;
     playerStats.armor = Math.max(playerStats.armor, 25); // Never enter next level with 0 armor
     playerStats.ammo = Math.max(playerStats.ammo, 20); // Never enter next level broke
+    playerStats.lives = Math.min(playerStats.lives + 1, playerStats.maxLives);
     if (typeof updateHUD === 'function') updateHUD();
     
     if (typeof loadLevel === 'function') loadLevel(currentLevel);

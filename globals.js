@@ -21,8 +21,10 @@ let playerStats = {
     health: 100,
     armor: 0,
     ammo: 0,
+    lives: 3,
     maxHealth: 100,
     maxArmor: 100,
+    maxLives: 3,
     currentWeapon: 0, // 0=Pistol, 1=Shotgun, 2=Rifle, 3=Plasma
     hasShotgun: false,
     hasRifle: false,
