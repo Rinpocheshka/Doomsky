@@ -33,6 +33,7 @@ To run the game locally, you need a local web server (to avoid CORS issues with 
 4. Open `http://localhost:3000` in your browser.
 
 ## Technologies Used 🛠️
+- Antigravity
 - [Three.js](https://threejs.org/) (WebGL rendering)
 - Vanilla JavaScript, HTML5, CSS3
 
