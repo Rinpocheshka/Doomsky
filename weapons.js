@@ -317,18 +317,35 @@ function shoot() {
 
             if (hitObject.userData.health <= 0) {
                 // Death!
-                playSound('enemy_die');
-                spawnParticles(hitObject.position.clone(), 15, 0xff2200);
-
-                // Hide boss bar on death
-                if (hitObject.userData.type === 3) {
+                const isBoss = hitObject.userData.type === 3;
+                
+                if (isBoss) {
+                    // Epic boss death sequence
+                    playSound('boss_death');
+                    screenShake(1.0, 2000);
+                    spawnParticles(hitObject.position.clone(), 40, 0xff2200);
+                    spawnParticles(hitObject.position.clone(), 20, 0xffaa00);
+                    spawnParticles(hitObject.position.clone(), 15, 0xff00ff);
+                    
+                    // White flash
+                    const flash = document.getElementById('damage-flash');
+                    flash.style.background = 'rgba(255, 255, 255, 0.8)';
+                    setTimeout(() => { flash.style.background = 'rgba(255, 255, 255, 0)'; }, 500);
+                    
+                    // Hide boss bar
                     const bossBar = document.getElementById('boss-hpbar-container');
                     if (bossBar) bossBar.style.display = 'none';
+                    
+                    // Clear all boss projectiles
+                    if (typeof clearBossProjectiles === 'function') clearBossProjectiles();
+                } else {
+                    playSound('enemy_die');
                 }
                 
+                spawnParticles(hitObject.position.clone(), 15, 0xff2200);
+
                 // 30% Loot Drop (boss always drops loot)
                 const dropRoll = Math.random();
-                const isBoss = hitObject.userData.type === 3;
                 if (isBoss || dropRoll < 0.3) {
                     const roll = Math.random();
                     let dropType = 'ammo';

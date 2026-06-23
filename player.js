@@ -113,6 +113,8 @@ function setWeaponSprite(index) {
 }
 
 function takeDamage(amount) {
+    if (invulnerabilityTimer > 0) return; // Invulnerability frames active
+
     let damageToHealth = amount;
     if (playerStats.armor > 0) {
         const armorDmg = Math.min(amount * 0.5, playerStats.armor);
@@ -146,7 +148,8 @@ function takeDamage(amount) {
                 rFlash.style.opacity = '1';
                 setTimeout(() => rFlash.style.opacity = '0', 100);
             }
-            // Give brief invulnerability (could be added) or simply restore health.
+            // Give 3 seconds of invulnerability
+            invulnerabilityTimer = 3.0;
         } else {
             // Real Game Over
             gameState = 'GAMEOVER';
@@ -338,6 +341,16 @@ function checkInteractions(position) {
     }
     
     if (exitPortal && position.distanceTo(exitPortal.position) < 3) {
+        const enems = typeof getEnemies === 'function' ? getEnemies() : [];
+        if (enems.length > 0) {
+            showPopup(`СНАЧАЛА УБЕЙТЕ ВСЕХ ВРАГОВ! Осталось: ${enems.length}`, '#ff0000');
+            
+            // Push player back slightly to avoid rapid popup spam
+            const pushDir = new THREE.Vector3().subVectors(controls.getObject().position, exitPortal.position).normalize();
+            controls.getObject().position.add(pushDir.multiplyScalar(0.5));
+            return;
+        }
+        
         playSound('portal');
         
         const elapsed = Math.round((Date.now() - levelStartTime) / 1000);
@@ -419,6 +432,17 @@ function updatePlayer(delta) {
         footstepTimer = 0;
         if (weaponSprite) {
             weaponSprite.style.transform = `translateX(-50%) translateY(0px)`;
+        }
+    }
+    
+    // Invulnerability blinking
+    if (invulnerabilityTimer > 0) {
+        invulnerabilityTimer -= delta;
+        if (weaponSprite) {
+            weaponSprite.style.opacity = (Math.floor(invulnerabilityTimer * 10) % 2 === 0) ? '0.5' : '1.0';
+        }
+        if (invulnerabilityTimer <= 0 && weaponSprite) {
+            weaponSprite.style.opacity = '1.0';
         }
     }
     

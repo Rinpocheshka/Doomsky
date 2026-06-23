@@ -16,6 +16,7 @@ let currentLevel = 0;
 let score = 0;
 let totalKills = 0;
 let levelStartTime = 0;
+let invulnerabilityTimer = 0;
 
 let playerStats = {
     health: 100,
@@ -113,6 +114,39 @@ function playSound(type) {
             g.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.6);
             osc.connect(g); g.connect(audioCtx.destination);
             osc.start(); osc.stop(audioCtx.currentTime + 0.6);
+            break;
+        }
+        case 'boss_fire': {
+            // Deep rumbling fireball sound
+            const osc = audioCtx.createOscillator();
+            osc.type = 'sawtooth';
+            osc.frequency.setValueAtTime(120, audioCtx.currentTime);
+            osc.frequency.exponentialRampToValueAtTime(60, audioCtx.currentTime + 0.25);
+            const noise = audioCtx.createBuffer(1, audioCtx.sampleRate * 0.2, audioCtx.sampleRate);
+            const nd = noise.getChannelData(0);
+            for (let i = 0; i < nd.length; i++) nd[i] = (Math.random() * 2 - 1) * (1 - i / nd.length);
+            const ns = audioCtx.createBufferSource(); ns.buffer = noise;
+            const g = audioCtx.createGain();
+            g.gain.setValueAtTime(0.5, audioCtx.currentTime);
+            g.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.3);
+            osc.connect(g); ns.connect(g); g.connect(audioCtx.destination);
+            osc.start(); osc.stop(audioCtx.currentTime + 0.3);
+            ns.start(); ns.stop(audioCtx.currentTime + 0.3);
+            break;
+        }
+        case 'boss_death': {
+            // Epic explosion sound
+            const buf = audioCtx.createBuffer(1, audioCtx.sampleRate * 1.5, audioCtx.sampleRate);
+            const d = buf.getChannelData(0);
+            for (let i = 0; i < d.length; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / d.length, 0.5);
+            const s = audioCtx.createBufferSource(); s.buffer = buf;
+            const f = audioCtx.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = 600;
+            f.frequency.exponentialRampToValueAtTime(80, audioCtx.currentTime + 1.5);
+            const g = audioCtx.createGain();
+            g.gain.setValueAtTime(0.8, audioCtx.currentTime);
+            g.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 1.5);
+            s.connect(f); f.connect(g); g.connect(audioCtx.destination);
+            s.start(); s.stop(audioCtx.currentTime + 1.5);
             break;
         }
     }

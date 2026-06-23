@@ -1,6 +1,7 @@
 // Enemy AI and Logic
 
 const enemies = [];
+const bossProjectiles = [];
 const enemyMaterials = [];
 
 loadTransparentTexture('assets/monster.png', (texture) => {
@@ -82,8 +83,10 @@ function spawnEnemy(x, z, overrideType = null) {
         health: def.hp,
         maxHealth: def.hp,
         speed: def.speed,
+        baseSpeed: def.speed,
         attackCooldown: Math.random() * def.attackRate, // stagger initial attack
         attackDamage: def.damage,
+        baseDamage: def.damage,
         attackRate: def.attackRate,
         retreatChance: def.retreatChance,
         ui: healthEl,
@@ -94,6 +97,10 @@ function spawnEnemy(x, z, overrideType = null) {
         detectionRange: def.detRange,
         idleTimer: 1.0 + Math.random() * 4.0,
         alertTimer: 0, // plays alert sound once on detection
+        // Boss-specific
+        bossPhase: 0,
+        projectileCooldown: 3.0,
+        bossRageTimer: 0,
     };
     
     scene.add(enemy);
@@ -230,6 +237,60 @@ function updateEnemies(delta) {
                 ud.attackCooldown = ud.attackRate;
                 if (typeof takeDamage === 'function') takeDamage(ud.attackDamage);
             }
+
+            // ── Boss Phase System ──
+            if (ud.type === 3) {
+                const hpPercent = ud.health / ud.maxHealth;
+                
+                // Phase transitions
+                if (hpPercent <= 0.2 && ud.bossPhase < 3) {
+                    ud.bossPhase = 3;
+                    ud.speed = ud.baseSpeed * 1.8;
+                    ud.attackDamage = 50;
+                    showPopup('БОСС В ЯРОСТИ!', '#ff0000');
+                    screenShake(0.6, 500);
+                    // Red tint on boss sprite
+                    enemy.material.color.setHex(0xff3333);
+                } else if (hpPercent <= 0.5 && ud.bossPhase < 2) {
+                    ud.bossPhase = 2;
+                    ud.speed = ud.baseSpeed * 1.4;
+                    showPopup('БОСС УСКОРЯЕТСЯ!', '#ff8800');
+                    screenShake(0.4, 300);
+                } else if (ud.bossPhase === 0 && ud.state !== 'idle') {
+                    ud.bossPhase = 1;
+                }
+
+                // Projectile firing
+                ud.projectileCooldown -= delta;
+                if (ud.projectileCooldown <= 0 && ud.state !== 'idle') {
+                    const fireDir = _dirToPlayer.clone();
+                    if (ud.bossPhase >= 3) {
+                        // Fan of 3 projectiles
+                        spawnBossProjectile(enemy.position, fireDir.clone(), 25);
+                        const left = fireDir.clone().applyAxisAngle(new THREE.Vector3(0,1,0), 0.3);
+                        spawnBossProjectile(enemy.position, left, 20);
+                        const right = fireDir.clone().applyAxisAngle(new THREE.Vector3(0,1,0), -0.3);
+                        spawnBossProjectile(enemy.position, right, 20);
+                        ud.projectileCooldown = 1.5;
+                    } else if (ud.bossPhase >= 2) {
+                        spawnBossProjectile(enemy.position, fireDir, 25);
+                        ud.projectileCooldown = 2.0;
+                    } else {
+                        spawnBossProjectile(enemy.position, fireDir, 25);
+                        ud.projectileCooldown = 3.0;
+                    }
+                    playSound('boss_fire');
+                }
+
+                // Phase 2+ periodic rage shake
+                if (ud.bossPhase >= 2) {
+                    ud.bossRageTimer -= delta;
+                    if (ud.bossRageTimer <= 0) {
+                        screenShake(0.2, 200);
+                        ud.bossRageTimer = 10;
+                    }
+                }
+            }
         }
 
         if (ud.attackCooldown > 0) ud.attackCooldown -= delta;
@@ -257,4 +318,91 @@ function updateEnemies(delta) {
             ud.ui.style.display = 'none';
         }
     });
+
+    // Update boss projectiles
+    updateBossProjectiles(delta);
+}
+
+// ── Boss Projectile System ──
+function spawnBossProjectile(origin, direction, damage) {
+    const geo = new THREE.SphereGeometry(0.3, 8, 8);
+    const mat = new THREE.MeshBasicMaterial({ color: 0xff2200, transparent: true, opacity: 0.9 });
+    const proj = new THREE.Mesh(geo, mat);
+    proj.position.set(origin.x, 1.5, origin.z);
+    
+    // Add glow light
+    const light = new THREE.PointLight(0xff4400, 2, 15);
+    proj.add(light);
+    
+    proj.userData = {
+        direction: direction.clone().normalize(),
+        speed: 22,
+        damage: damage,
+        life: 5.0,
+        isProjectile: true
+    };
+    
+    scene.add(proj);
+    bossProjectiles.push(proj);
+}
+
+function updateBossProjectiles(delta) {
+    const playerPos = controls.getObject().position;
+    
+    for (let i = bossProjectiles.length - 1; i >= 0; i--) {
+        const proj = bossProjectiles[i];
+        const ud = proj.userData;
+        
+        // Move projectile
+        proj.position.x += ud.direction.x * ud.speed * delta;
+        proj.position.z += ud.direction.z * ud.speed * delta;
+        
+        // Pulsating glow effect
+        ud.life -= delta;
+        proj.material.opacity = 0.6 + Math.sin(ud.life * 15) * 0.3;
+        
+        // Check wall collision
+        let hitWall = false;
+        if (typeof getLevelWalls === 'function') {
+            const walls = getLevelWalls();
+            for (let w = 0; w < walls.length; w++) {
+                const dx = Math.abs(proj.position.x - walls[w].position.x);
+                const dz = Math.abs(proj.position.z - walls[w].position.z);
+                if (dx < 2.0 && dz < 2.0) {
+                    hitWall = true;
+                    break;
+                }
+            }
+        }
+        
+        // Check player collision
+        const distToPlayer = proj.position.distanceTo(playerPos);
+        if (distToPlayer < 2.0) {
+            if (typeof takeDamage === 'function') takeDamage(ud.damage);
+            spawnParticles(proj.position.clone(), 8, 0xff4400);
+            removeProjectile(i);
+            continue;
+        }
+        
+        // Destroy on wall hit or timeout
+        if (hitWall || ud.life <= 0) {
+            spawnParticles(proj.position.clone(), 5, 0xff6600);
+            removeProjectile(i);
+            continue;
+        }
+    }
+}
+
+function removeProjectile(index) {
+    const proj = bossProjectiles[index];
+    scene.remove(proj);
+    proj.geometry.dispose();
+    proj.material.dispose();
+    bossProjectiles.splice(index, 1);
+}
+
+function clearBossProjectiles() {
+    for (let i = bossProjectiles.length - 1; i >= 0; i--) {
+        removeProjectile(i);
+    }
 }
