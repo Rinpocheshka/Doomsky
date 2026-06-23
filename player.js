@@ -278,7 +278,8 @@ function resolveCollision(position) {
                 const playerBottom = position.y - playerHeight;
                 
                 // If player is falling onto the object, or already standing on it
-                if (playerBottom >= topY - 0.6) {
+                // We restrict jumping onto objects that are at least as tall as the ceiling (4.0) to prevent Out of Bounds
+                if (playerBottom >= topY - 0.6 && topY < 4.0) {
                     // Update ground level
                     if (topY > currentGroundY) currentGroundY = topY;
                 } else {
