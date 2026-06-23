@@ -14,8 +14,11 @@ let moveBackward = false;
 let moveLeft = false;
 let moveRight = false;
 let isRunning = false;
+let levelStartTime = 0;
+let invulnerabilityTimer = 0;
 let canJump = false;
 let jumpCount = 0;
+let currentGroundY = 0; // Tracks the height of the object the player is standing on
 
 let bobTimer = 0;
 let footstepTimer = 0;
@@ -246,22 +249,49 @@ window.addEventListener('blur', resetMovementState);
 document.addEventListener('visibilitychange', () => { if (document.hidden) resetMovementState(); });
 
 function resolveCollision(position) {
+    currentGroundY = 0; // Default ground is 0
     if (typeof getLevelWalls === 'function') {
         const walls = getLevelWalls();
         for (let i = 0; i < walls.length; i++) {
             const wall = walls[i];
             const dx = position.x - wall.position.x;
             const dz = position.z - wall.position.z;
+            
+            // Get dimensions based on geometry type
+            let radiusX = 2.0;
+            let radiusZ = 2.0;
+            let topY = 4.0;
+            
+            if (wall.geometry.type === 'BoxGeometry') {
+                radiusX = wall.geometry.parameters.width / 2;
+                radiusZ = wall.geometry.parameters.depth / 2;
+                topY = wall.position.y + wall.geometry.parameters.height / 2;
+            } else if (wall.geometry.type === 'CylinderGeometry') {
+                radiusX = wall.geometry.parameters.radiusTop;
+                radiusZ = wall.geometry.parameters.radiusTop;
+                topY = wall.position.y + wall.geometry.parameters.height / 2;
+            }
+            
             const absDx = Math.abs(dx);
             const absDz = Math.abs(dz);
-            if (absDx < 2.5 && absDz < 2.5) {
-                // Push player out on the axis of least penetration
-                const overlapX = 2.5 - absDx;
-                const overlapZ = 2.5 - absDz;
-                if (overlapX < overlapZ) {
-                    position.x += dx > 0 ? overlapX : -overlapX;
+            
+            // Player radius is roughly 0.5
+            if (absDx < radiusX + 0.5 && absDz < radiusZ + 0.5) {
+                const playerBottom = position.y - playerHeight;
+                
+                // If player is falling onto the object, or already standing on it
+                if (playerBottom >= topY - 0.6) {
+                    // Update ground level
+                    if (topY > currentGroundY) currentGroundY = topY;
                 } else {
-                    position.z += dz > 0 ? overlapZ : -overlapZ;
+                    // Push player out on the axis of least penetration
+                    const overlapX = (radiusX + 0.5) - absDx;
+                    const overlapZ = (radiusZ + 0.5) - absDz;
+                    if (overlapX < overlapZ) {
+                        position.x += dx > 0 ? overlapX : -overlapX;
+                    } else {
+                        position.z += dz > 0 ? overlapZ : -overlapZ;
+                    }
                 }
             }
         }
@@ -394,14 +424,18 @@ function updatePlayer(delta) {
     // Smooth collision resolution
     resolveCollision(playerObj.position);
 
-    // Camera tilt removed as it conflicts with PointerLockControls
-
     playerObj.position.y += (velocity.y * delta);
-    if (playerObj.position.y < playerHeight) {
+    const targetY = currentGroundY + playerHeight;
+    
+    if (playerObj.position.y <= targetY) {
         velocity.y = 0;
-        playerObj.position.y = playerHeight;
+        playerObj.position.y = targetY;
         canJump = true;
         jumpCount = 0;
+    } else if (canJump && velocity.y === 0 && playerObj.position.y > targetY) {
+        // Walked off an edge
+        canJump = false;
+        jumpCount = 1; // Allows a single mid-air jump
     }
 
     checkInteractions(playerObj.position);
@@ -413,7 +447,7 @@ function updatePlayer(delta) {
     if (isMoving) {
         const bobSpeed = isRunning ? 15 : 10;
         bobTimer += delta * bobSpeed;
-        playerObj.position.y = playerHeight + Math.sin(bobTimer) * 0.1;
+        playerObj.position.y = targetY + Math.sin(bobTimer) * 0.1;
         
         if (weaponSprite) {
             const swayX = Math.cos(bobTimer) * 15;
