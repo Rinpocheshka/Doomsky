@@ -1,7 +1,7 @@
 // Player Movement, Physics, and Jumping
 
-const playerSpeed = 40.0;
-const runSpeed = 70.0;
+const playerSpeed = 60.0;
+const dashSpeed = 400.0; // Dash impulse
 const gravity = 30.0;
 const jumpVelocity = 14.0;
 const playerHeight = 2.0;
@@ -13,7 +13,7 @@ let moveForward = false;
 let moveBackward = false;
 let moveLeft = false;
 let moveRight = false;
-let isRunning = false;
+let dashCooldown = 0;
 let canJump = false;
 let jumpCount = 0;
 let currentGroundY = 0; // Tracks the height of the object the player is standing on
@@ -176,7 +176,23 @@ const onKeyDown = function (event) {
         case 'ArrowRight':
         case 'KeyD': moveRight = true; break;
         case 'ShiftLeft':
-        case 'ShiftRight': isRunning = true; break;
+        case 'ShiftRight':
+            if (dashCooldown <= 0) {
+                let dZ = Number(moveForward) - Number(moveBackward);
+                let dX = Number(moveRight) - Number(moveLeft);
+                if (dZ === 0 && dX === 0) dZ = 1; // Default to dashing forward
+                
+                const dir = new THREE.Vector3(dX, 0, dZ).normalize();
+                velocity.x -= dir.x * dashSpeed;
+                velocity.z -= dir.z * dashSpeed;
+                dashCooldown = 1.2; // 1.2s cooldown
+                
+                // Camera FOV effect for speed
+                camera.fov = 100;
+                camera.updateProjectionMatrix();
+                playSound('pickup');
+            }
+            break;
         case 'Space':
             if (canJump === true) {
                 velocity.y = jumpVelocity;
@@ -228,7 +244,7 @@ const onKeyUp = function (event) {
         case 'ArrowRight':
         case 'KeyD': moveRight = false; break;
         case 'ShiftLeft':
-        case 'ShiftRight': isRunning = false; break;
+        case 'ShiftRight': break;
     }
 };
 
@@ -410,7 +426,16 @@ function updatePlayer(delta) {
     direction.x = Number(moveRight) - Number(moveLeft);
     direction.normalize(); 
 
-    const currentSpeed = isRunning ? runSpeed : playerSpeed;
+    const currentSpeed = playerSpeed;
+
+    if (dashCooldown > 0) dashCooldown -= delta;
+    
+    // Lerp FOV back to 75 for dash effect
+    if (camera.fov > 75) {
+        camera.fov = THREE.MathUtils.lerp(camera.fov, 75, delta * 5);
+        if (camera.fov < 75.5) camera.fov = 75;
+        camera.updateProjectionMatrix();
+    }
 
     if (moveForward || moveBackward) velocity.z -= direction.z * currentSpeed * delta;
     if (moveLeft || moveRight) velocity.x -= direction.x * currentSpeed * delta;
@@ -444,7 +469,7 @@ function updatePlayer(delta) {
     const isMoving = (moveForward || moveBackward || moveLeft || moveRight) && canJump;
     
     if (isMoving) {
-        const bobSpeed = isRunning ? 15 : 10;
+        const bobSpeed = 12;
         bobTimer += delta * bobSpeed;
         playerObj.position.y = targetY + Math.sin(bobTimer) * 0.1;
         
@@ -458,7 +483,7 @@ function updatePlayer(delta) {
         footstepTimer -= delta;
         if (footstepTimer <= 0) {
             playSound('footstep');
-            footstepTimer = isRunning ? 0.25 : 0.4;
+            footstepTimer = 0.35;
         }
     } else {
         bobTimer = 0;

@@ -6,7 +6,7 @@ body {
     margin: 0;
     overflow: hidden;
     background-color: #000;
-    font-family: 'VT323', monospace;
+    font-family: 'Inter', sans-serif;
     user-select: none;
 }
 
@@ -253,13 +253,15 @@ body {
 #hud-panel {
     position: absolute;
     bottom: 0; left: 0; width: 100%;
-    height: 70px;
-    background: linear-gradient(to bottom, rgba(40,40,40,0.95) 0%, rgba(15,15,15,0.98) 100%);
-    border-top: 2px solid rgba(255,255,255,0.1);
+    height: 80px;
+    background: rgba(10, 10, 15, 0.4);
+    backdrop-filter: blur(12px);
+    border-top: 1px solid rgba(255, 255, 255, 0.15);
+    box-shadow: 0 -5px 25px rgba(0, 0, 0, 0.5);
     display: flex;
     justify-content: center;
     align-items: center;
-    gap: 10px;
+    gap: 15px;
     padding: 0 20px;
 }
 
@@ -267,28 +269,34 @@ body {
     display: flex;
     flex-direction: column;
     align-items: center;
-    background: rgba(0,0,0,0.6);
-    border: 1px solid rgba(255,255,255,0.08);
-    border-radius: 4px;
-    padding: 4px 15px;
-    min-width: 100px;
+    background: rgba(0, 0, 0, 0.3);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    box-shadow: inset 0 0 10px rgba(0,0,0,0.5);
+    border-radius: 8px;
+    padding: 8px 20px;
+    min-width: 110px;
 }
 
 .hud-label {
-    color: #666;
-    font-size: 14px;
+    color: #888;
+    font-size: 13px;
+    font-weight: 600;
     letter-spacing: 2px;
+    text-transform: uppercase;
 }
 
 .hud-value {
-    font-size: 30px;
+    font-family: 'Orbitron', sans-serif;
+    font-weight: 700;
+    font-size: 32px;
+    text-shadow: 0 0 10px rgba(255,255,255,0.2);
 }
 
-.health-val { color: #ff4444; }
-.armor-val  { color: #44aaff; }
-.ammo-val   { color: #ffaa00; }
-.weapon-val { color: #00ff00; font-size: 22px; }
-.score-val  { color: #ff66ff; }
+.health-val { color: #ff4444; text-shadow: 0 0 10px rgba(255,68,68,0.5); }
+.armor-val  { color: #44aaff; text-shadow: 0 0 10px rgba(68,170,255,0.5); }
+.ammo-val   { color: #ffaa00; text-shadow: 0 0 10px rgba(255,170,0,0.5); }
+.weapon-val { color: #00ff00; font-size: 24px; text-shadow: 0 0 10px rgba(0,255,0,0.5); }
+.score-val  { color: #ff66ff; text-shadow: 0 0 10px rgba(255,102,255,0.5); }
 
 /* Health/Armor bars */
 .hud-bar-container {

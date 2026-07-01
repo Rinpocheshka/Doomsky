@@ -7,6 +7,7 @@ scene.fog = new THREE.FogExp2(0x050505, 0.035); // Exponential fog — denser, m
 const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
 
 const renderer = new THREE.WebGLRenderer({ antialias: false });
+let composer, bloomPass;
 const controls = new THREE.PointerLockControls(camera, document.body);
 const clock = new THREE.Clock();
 
@@ -17,6 +18,7 @@ let score = 0;
 let totalKills = 0;
 let levelStartTime = 0;
 let invulnerabilityTimer = 0;
+let hitStopTimer = 0;
 
 let playerStats = {
     health: 100,
@@ -59,13 +61,27 @@ function playSound(type) {
             break;
         }
         case 'hit': {
+            // Modern FPS hitmarker sound (high pitched tick + low thud)
+            const osc = audioCtx.createOscillator();
+            osc.type = 'square';
+            osc.frequency.setValueAtTime(800, audioCtx.currentTime);
+            osc.frequency.exponentialRampToValueAtTime(100, audioCtx.currentTime + 0.1);
+            
+            const g1 = audioCtx.createGain(); 
+            g1.gain.setValueAtTime(0.5, audioCtx.currentTime);
+            g1.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.1);
+            
+            osc.connect(g1); g1.connect(audioCtx.destination);
+            osc.start(); osc.stop(audioCtx.currentTime + 0.1);
+
+            // Thud noise
             const buf = audioCtx.createBuffer(1, audioCtx.sampleRate * 0.08, audioCtx.sampleRate);
             const d = buf.getChannelData(0);
             for (let i = 0; i < d.length; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / d.length);
             const s = audioCtx.createBufferSource(); s.buffer = buf;
-            const g = audioCtx.createGain(); g.gain.setValueAtTime(0.4, audioCtx.currentTime);
-            g.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.08);
-            s.connect(g); g.connect(audioCtx.destination);
+            const g2 = audioCtx.createGain(); g2.gain.setValueAtTime(0.4, audioCtx.currentTime);
+            g2.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.08);
+            s.connect(g2); g2.connect(audioCtx.destination);
             s.start(); s.stop(audioCtx.currentTime + 0.08);
             break;
         }

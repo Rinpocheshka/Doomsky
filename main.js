@@ -9,6 +9,17 @@ function init() {
     renderer.toneMappingExposure = 0.8;
     document.body.appendChild(renderer.domElement);
 
+    // Post-processing setup
+    const renderPass = new THREE.RenderPass(scene, camera);
+    bloomPass = new THREE.UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), 1.5, 0.4, 0.85);
+    bloomPass.threshold = 0;
+    bloomPass.strength = 1.2; // Glow intensity
+    bloomPass.radius = 0.5;
+
+    composer = new THREE.EffectComposer(renderer);
+    composer.addPass(renderPass);
+    composer.addPass(bloomPass);
+
     // Ambient light — very dim for atmosphere
     const ambientLight = new THREE.AmbientLight(0x202030, 1.8);
     scene.add(ambientLight);
@@ -204,6 +215,7 @@ function onWindowResize() {
     camera.aspect = window.innerWidth / window.innerHeight;
     camera.updateProjectionMatrix();
     renderer.setSize(window.innerWidth, window.innerHeight);
+    if (composer) composer.setSize(window.innerWidth, window.innerHeight);
 }
 
 // FPS counter
@@ -226,7 +238,9 @@ function animate() {
         _fpsTime = 0;
     }
 
-    if (gameState === 'PLAYING') {
+    if (hitStopTimer > 0) {
+        hitStopTimer -= delta;
+    } else if (gameState === 'PLAYING') {
         if (typeof updatePlayer === 'function') updatePlayer(delta);
         if (typeof updateEnemies === 'function') updateEnemies(delta);
         if (typeof updateWeapons === 'function') updateWeapons(delta);
@@ -234,7 +248,11 @@ function animate() {
         if (typeof updateParticles === 'function') updateParticles(delta);
     }
 
-    renderer.render(scene, camera);
+    if (composer) {
+        composer.render();
+    } else {
+        renderer.render(scene, camera);
+    }
 }
 
 init();

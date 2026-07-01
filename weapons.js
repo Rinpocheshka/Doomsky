@@ -220,27 +220,38 @@ function shoot() {
     let cooldown = 250;
     let flashColor = 'rgba(255,200,0,1)';
     
+    let recoilPitch = 0.02;
+
     if (playerStats.currentWeapon === 1) { // Shotgun
         playerStats.ammo--;
         damage = 60;
         cooldown = 550;
+        recoilPitch = 0.08;
         playShotgunSound();
         screenShake(0.4, 150);
     } else if (playerStats.currentWeapon === 2) { // Rifle
         playerStats.ammo--;
         damage = 25;
         cooldown = 120;
+        recoilPitch = 0.03;
         playRifleSound();
     } else if (playerStats.currentWeapon === 3) { // Plasma
         playerStats.ammo -= 5;
         damage = 120;
         cooldown = 700;
+        recoilPitch = 0.06;
         flashColor = 'rgba(0,200,255,1)';
         playPlasmaSound();
         screenShake(0.3, 200);
     } else {
         playPistolSound();
     }
+    
+    // Apply camera recoil
+    const euler = new THREE.Euler(0, 0, 0, 'YXZ');
+    euler.setFromQuaternion(camera.quaternion);
+    euler.x += recoilPitch;
+    camera.quaternion.setFromEuler(euler);
 
     // ── Single raycaster call — results reused for tracer AND hit detection ──
     raycaster.setFromCamera(_screenCenter, camera);
@@ -298,6 +309,9 @@ function shoot() {
         
         if (hitObject.userData && hitObject.userData.isEnemy) {
             hitObject.userData.health -= damage;
+            
+            // Hit-stop effect (Freezes game logic for 50ms for maximum impact)
+            hitStopTimer = 0.05;
             
             // Hit flash
             hitObject.material.color.setHex(0xff0000);
