@@ -431,6 +431,11 @@ function checkInteractions(position) {
             `Время: ${elapsed} сек.<br>Бонус: +${timeBonus} очков<br>Счёт: ${score}`;
         
         currentLevel++;
+        
+        const nextBtn = document.getElementById('next-level-btn');
+        if (nextBtn) {
+            nextBtn.textContent = currentLevel >= 4 ? 'ЗАВЕРШИТЬ ИГРУ' : 'СЛЕДУЮЩИЙ УРОВЕНЬ →';
+        }
     }
 }
 
