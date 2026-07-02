@@ -1,7 +1,7 @@
 // Player Movement, Physics, and Jumping
 
 const playerSpeed = 60.0;
-const dashSpeed = 400.0; // Dash impulse
+const DASH_DISTANCE = 6.0;  // Total units to travel per dash (reduced from 400 impulse)
 const gravity = 30.0;
 const jumpVelocity = 14.0;
 const playerHeight = 2.0;
@@ -182,13 +182,32 @@ const onKeyDown = function (event) {
                 let dX = Number(moveRight) - Number(moveLeft);
                 if (dZ === 0 && dX === 0) dZ = 1; // Default to dashing forward
                 
-                const dir = new THREE.Vector3(dX, 0, dZ).normalize();
-                velocity.x -= dir.x * dashSpeed;
-                velocity.z -= dir.z * dashSpeed;
-                dashCooldown = 1.2; // 1.2s cooldown
+                // Safe stepped dash: move in small increments checking collision each step
+                const playerObj = controls.getObject();
+                const STEP = 0.5;
+                const steps = Math.ceil(DASH_DISTANCE / STEP);
+                
+                for (let s = 0; s < steps; s++) {
+                    const prevX = playerObj.position.x;
+                    const prevZ = playerObj.position.z;
+                    
+                    // PointerLockControls uses local axes:
+                    // moveForward moves along -Z local (forward), moveRight moves along +X local (right)
+                    controls.moveForward(dZ * STEP);
+                    controls.moveRight(dX * STEP);
+                    
+                    resolveCollision(playerObj.position);
+                    
+                    // If collision pushed us back almost fully — we hit a wall, stop
+                    const movedX = Math.abs(playerObj.position.x - prevX);
+                    const movedZ = Math.abs(playerObj.position.z - prevZ);
+                    if (movedX < 0.05 && movedZ < 0.05) break;
+                }
+                
+                dashCooldown = 1.2;
                 
                 // Camera FOV effect for speed
-                camera.fov = 100;
+                camera.fov = 95;
                 camera.updateProjectionMatrix();
                 playSound('pickup');
             }
